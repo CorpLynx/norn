@@ -227,3 +227,82 @@ def test_inline_ip_and_port_validation_helpers():
         "console.log(JSON.stringify(cases.map(isIp)));",
     ])
     assert _run_node(src) == [True, False, True, True, False, False, False, False, False]
+
+
+# ---- layout polish: lab toggle, scenario cards, sim bar, console, path map sizing ------------------
+def test_about_lab_toggle_is_a_disclosure_collapsed_after_first_trace():
+    assert ('<button type="button" id="labtoggle" aria-expanded="true" aria-controls="labinfo">' in APP_HTML)
+    assert 'id="labinfo"' in APP_HTML and "#labinfo[hidden]{display:none}" in APP_HTML
+    assert '$("#labtoggle").setAttribute("aria-expanded", String(open))' in APP_HTML
+    load = _slice(_script(APP_HTML), "function loadEntry", "function renderSummary")
+    assert "if (!S.labTouched) setLab(false);" in load   # collapses after the first trace unless the user chose a state
+
+
+def test_scenario_cards_group_with_arrow_keys_and_clear_states():
+    assert '<div id="presets" role="group" aria-label="Scenarios">' in APP_HTML
+    nav = _slice(_script(APP_HTML), '$("#presets").addEventListener("keydown"', "async function refreshHistory")
+    for key in ("ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "Home", "End"):
+        assert key in nav, key
+    assert "e.stopPropagation()" in nav   # arrows on a card never step the trace
+    assert "p.tabIndex = p === on ? 0 : -1" in APP_HTML and 'aria-pressed' in APP_HTML
+    assert '.preset.on::after{content:"SELECTED"' in APP_HTML and ".preset .x{display:inline-block" in APP_HTML
+
+
+def test_sim_bar_stays_on_one_row_and_step_label_ellipsises():
+    css = APP_HTML[:APP_HTML.index("</style>")]
+    assert "#simbar{display:flex;flex-wrap:nowrap;" in css
+    assert re.search(r"#stepinfo\{[^}]*text-overflow:ellipsis[^}]*white-space:nowrap", css)
+    assert "grid-template-columns:minmax(0,1fr)" in _slice(css, "#sim{grid-area:sim", "}")   # never wider than its grid column
+    assert '$("#stepinfo").textContent =' not in APP_HTML   # all writes go through setStepInfo (textContent + title)
+
+
+def test_console_is_a_scroll_region_with_pinned_prompt():
+    script = _script(APP_HTML)
+    con = _slice(script, "function consoleHtml", "function bindConsole")
+    assert con.index("`,\n    `<div class=\"term\"") < con.index('<div class="prompt">')   # term + prompt are the pinned part
+    assert 'html = `<div class="devscroll">${html}${top}</div>${bottom}`' in script
+    assert '<div class="term" id="term" role="log" aria-live="polite"' in con and 'tabindex="0"' in con
+    assert re.search(r"\.term\{[^}]*flex:1 1 0;[^}]*overflow:auto", APP_HTML)
+
+
+@pytest.mark.skipif(not NODE, reason="node not installed")
+def test_hostile_names_escaped_in_console_and_step_label():
+    script = _script(APP_HTML)
+    src = "\n".join([
+        _helpers(script), "const S = {boot:{mode:'demo'}};", f"const evil = {json.dumps(EVIL)};",
+        "const el = {textContent:'', title:'', set innerHTML(v){ throw new Error('innerHTML used'); }};",
+        "const $ = () => el;",
+        re.search(r"^const CISCO_ALLOWED = [\s\S]*?\];$", script, re.M).group(0),
+        re.search(r"^const PANOS_ALLOWED = [\s\S]*?\];$", script, re.M).group(0),
+        _slice(script, "function consoleNotice", "function consoleError"),
+        _slice(script, "function consoleHtml", "function bindConsole"),
+        re.search(r"^function setStepInfo.*$", script, re.M).group(0),
+        "setStepInfo(evil + ': 1 hop in this trace');",
+        "const dev = {platform:'cisco_iosxe', quick:[evil]};",
+        "const parts = consoleHtml(evil, dev, evil + '#', {lines: []});",
+        "console.log(JSON.stringify({parts, text: el.textContent, title: el.title}));",
+    ])
+    out = _run_node(src)
+    html = "".join(out["parts"])
+    assert len(out["parts"]) == 2
+    assert "<img" not in html and "&lt;img src=x onerror=alert(1)&gt;" in html
+    assert out["text"].startswith(EVIL) and out["title"] == out["text"]   # text only, never parsed as HTML
+
+
+@pytest.mark.skipif(not NODE, reason="node not installed")
+def test_path_map_fit_rules():
+    script = _script(APP_HTML)
+    src = "\n".join([
+        re.search(r"^const PM_MIN_SCALE = .*$", script, re.M).group(0),
+        _slice(script, "function fitPm", "function curHopIndex"),
+        "globalThis.getComputedStyle = () => ({paddingLeft:'0', paddingRight:'0', paddingTop:'0', paddingBottom:'0'});",
+        "const run = (bw, bh) => { const svg = {style:{}, getAttribute: () => '0 0 2000 300'};",
+        "  fitPm({clientWidth: bw, clientHeight: bh, querySelector: () => svg}); return [parseFloat(svg.style.width), parseFloat(svg.style.height)]; };",
+        "console.log(JSON.stringify({wide: run(1800, 600), short: run(1800, 200), narrow: run(600, 200), tall: run(600, 900), hidden: run(0, 0)}));",
+    ])
+    out = _run_node(src)
+    assert out["wide"] == [1800, 270]                 # fits the width
+    assert out["short"] == [2000 * 200 / 300, 200]   # never taller than the panel
+    assert out["narrow"] == [1500, 225]               # readable floor (0.75), scrolls
+    assert out["tall"] == [2000, 300]                 # must scroll anyway: grow to actual size to use the height
+    assert out["hidden"] == [None, None]              # a hidden panel is left alone

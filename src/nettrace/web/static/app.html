@@ -28,11 +28,14 @@ button{font:inherit;cursor:pointer;color:inherit}
 .skip{position:absolute;left:8px;top:-60px;z-index:20;background:#fff;color:#1b2430;padding:6px 10px;border-radius:6px}.skip:focus{top:8px}
 kbd{font:11px ui-monospace,Menlo,monospace;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--soft)}
 h1,h2,h3{margin:0}
+@media (max-width:600px){#simbar{flex-wrap:wrap}}
 @media (max-width:1180px){body{grid-template-columns:220px minmax(0,1fr) 340px}}
 @media (max-width:900px){
   html,body{overflow:auto;height:auto}body{display:flex;flex-direction:column;min-height:100%;overflow-x:hidden}
   #ws{height:60vh;min-height:320px;flex:none}#sim{height:320px;flex:none}#insp{flex:none;display:block;border-left:0;border-top:1px solid var(--line)}
-  #ipane{overflow:visible}#left{order:9;border-right:0;border-top:1px solid var(--line);overflow:visible}
+  #ipane{overflow:visible}#ipane.pmtab{overflow:hidden;height:70vh}#ipane.devtab{display:block;overflow:visible}
+  #ipane .devscroll{max-height:none;overflow:visible}#ipane .term{height:300px;flex:none}
+  #form{flex-basis:100%}#left{order:9;border-right:0;border-top:1px solid var(--line);overflow:visible}
   #canvas{touch-action:pan-y}}
 /* ===== 3. top bar + trace form ===== */
 #top{grid-area:top;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:8px 12px;background:var(--nav);color:var(--navtext)}
@@ -68,10 +71,14 @@ h1,h2,h3{margin:0}
 .sec{padding:10px 12px;border-bottom:1px solid var(--line)}
 .sec h2{margin:0 0 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .lab{font-size:12px;color:var(--muted);line-height:1.45}.lab b{color:var(--text)}
-.preset{display:block;width:100%;text-align:left;border:1px solid var(--line);border-left:5px solid var(--b-info);border-radius:6px;padding:7px 9px;margin-bottom:7px;background:var(--panel)}
-.preset:hover{background:var(--soft)}.preset.on{background:var(--sel);border-color:var(--accent)}.preset:disabled{opacity:.6;cursor:not-allowed}
+#labsec h2{margin:0}#labtoggle{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;padding:2px 0;text-align:left;font:inherit;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+#labtoggle:hover{color:var(--text)}#labtoggle .ch{font-size:10px;width:1em;flex:none}#labinfo{margin-top:8px}#labinfo[hidden]{display:none}
+.preset{position:relative;display:block;width:100%;text-align:left;border:1px solid var(--line);border-left:5px solid var(--b-info);border-radius:6px;padding:7px 9px;margin-bottom:7px;background:var(--panel)}
+.preset:hover{background:var(--soft)}.preset.on{background:var(--sel);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.preset.on::after{content:"SELECTED";position:absolute;right:8px;top:7px;font-size:9.5px;font-weight:800;letter-spacing:.08em;color:var(--accent)}
+.preset.on .t{padding-right:64px}.preset:disabled{opacity:.6;cursor:not-allowed}
 .preset .t{font-weight:600}.preset .s{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.35;overflow-wrap:anywhere}
-.preset .x{font-size:11.5px;font-weight:700;margin-top:3px}
+.preset .x{display:inline-block;font-size:11px;font-weight:700;margin-top:5px;padding:1px 8px;border:1px solid currentColor;border-radius:9px}
 .preset.REACHABLE{border-left-color:var(--b-pass)}.preset.BLOCKED{border-left-color:var(--b-block)}.preset.EXITED{border-left-color:var(--b-info)}.preset.INCOMPLETE{border-left-color:var(--b-warn)}
 .preset.REACHABLE .x{color:var(--t-pass)}.preset.BLOCKED .x{color:var(--t-block)}.preset.EXITED .x{color:var(--t-info)}.preset.INCOMPLETE .x{color:var(--t-warn)}
 .hist{display:flex;gap:6px;align-items:center;width:100%;text-align:left;background:none;border:0;padding:5px 4px;border-radius:5px;font:11.5px ui-monospace,Menlo,monospace}
@@ -90,8 +97,10 @@ h1,h2,h3{margin:0}
 #canvas{position:absolute;inset:0;cursor:grab}#canvas.drag{cursor:grabbing}
 #stage{position:absolute;left:0;top:0;transform-origin:0 0}
 #hint{position:absolute;left:10px;bottom:8px;z-index:3;font-size:11px;color:#3a4658;background:#ffffffdd;padding:2px 7px;border-radius:4px;max-width:calc(100% - 20px)}
-#pmview{position:absolute;inset:48px 10px 10px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;display:none;padding:6px}
-#pmview svg{width:100%;height:auto;min-width:900px}
+#pmview{position:absolute;inset:48px 10px 10px;background:#fbfcfd;border:1px solid var(--line);border-radius:8px;display:none}
+.pmbox{display:flex;overflow:auto;scrollbar-gutter:stable;padding:6px}.pmbox svg{flex:none;margin:auto;display:block}
+#ipane.pmtab{display:flex;flex-direction:column;overflow:hidden}#ipane .pmbox{flex:1 1 0;min-height:120px;background:#fbfcfd;border:1px solid var(--line);border-radius:8px;color:#1b2430}
+#ipane.pmtab .lab{flex:none;margin:8px 0 0}
 #busy{position:absolute;inset:0;background:#eef3f8e6;display:none;align-items:center;justify-content:center;z-index:4;font-weight:600;color:#2b3646;text-align:center;padding:20px}
 .spin{width:22px;height:22px;border:3px solid #c5d2e1;border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;margin-right:10px;flex:none}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -114,16 +123,17 @@ h1,h2,h3{margin:0}
 @keyframes flow{to{stroke-dashoffset:-32}}.seg.live{stroke-dasharray:14 18;animation:flow .9s linear infinite}
 @media (prefers-reduced-motion:reduce){.seg.live{animation:none}.spin{animation:none}}
 /* ===== 7. simulation panel: controls, scrubber, event list ===== */
-#sim{grid-area:sim;background:var(--panel);border-top:1px solid var(--line);display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:0;min-width:0}
-#simbar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--soft)}
+#sim{grid-area:sim;background:var(--panel);border-top:1px solid var(--line);display:grid;grid-template-rows:auto minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr);min-height:0;min-width:0}
+#simbar{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--soft)}
 #simbar b{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:6px}
 .ctl{background:var(--panel);border:1px solid var(--line);border-radius:5px;width:32px;height:28px;font-size:13px}
 .ctl:hover{border-color:var(--accent)}.ctl:disabled,#scrub:disabled{opacity:.45;cursor:default}
 #play{width:44px;background:var(--nav);color:#fff;border-color:var(--nav)}#replay{width:auto;padding:0 8px}
-#stepinfo{font:12px ui-monospace,Menlo,monospace;color:var(--text);margin-left:4px;min-width:90px}
-#scrub{flex:1 1 120px;min-width:90px;max-width:340px;accent-color:var(--accent);height:24px}
+#stepinfo{font:12px ui-monospace,Menlo,monospace;color:var(--text);margin-left:4px;min-width:0;flex:0 1 auto;max-width:30ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:1360px){#simbar>b,#simbar label[for=speed]{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
+#scrub{flex:1 1 120px;min-width:50px;max-width:340px;accent-color:var(--accent);height:24px}
 #simbar select{font-size:12px;height:28px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:5px}
-#simbar .sp{flex:1}#simbar label{font-size:11px;color:var(--muted)}
+#simbar .sp{flex:1 0 0}#simbar b,#simbar .ctl,#simbar label,#simbar select{flex:none}#simbar label{font-size:11px;color:var(--muted)}
 #kbhint{padding:4px 10px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
 #events{overflow:auto;min-height:0}
 #events table{width:100%;border-collapse:collapse;table-layout:fixed}
@@ -152,15 +162,17 @@ ul.det{padding-left:16px;margin:4px 0 12px}
 details.ev{border:1px solid var(--line);border-radius:6px;margin:6px 0}details.ev summary{padding:5px 8px;cursor:pointer;font:11px ui-monospace,Menlo,monospace;color:var(--accent);overflow-wrap:anywhere}
 pre{margin:0;padding:8px;max-height:300px;overflow:auto;background:var(--code);font:11px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
 .devhead{display:flex;gap:12px;align-items:center;margin-bottom:10px}.devhead svg{width:56px;height:56px;flex:none}
-.term{background:#0f1720;color:#d5e8cd;border-radius:8px;padding:10px;font:12px/1.45 ui-monospace,Menlo,monospace;height:300px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+#ipane.devtab{display:flex;flex-direction:column;overflow:hidden}
+.devscroll{flex:0 1 auto;max-height:45%;min-height:60px;overflow:auto;padding-right:2px}
+.term{background:#0f1720;color:#d5e8cd;border-radius:8px;padding:10px;font:12px/1.45 ui-monospace,Menlo,monospace;flex:1 1 0;min-height:110px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
 .term .cmd{color:#8ad4ff}.term .bad{color:#ff9a90}.term .muted{color:#9aa9bc}.term .warnline{color:#ffd37a}
-.prompt{display:flex;align-items:center;background:#0f1720;border-radius:6px;margin-top:6px;padding:4px 8px;color:#8ad4ff;font:12px ui-monospace,Menlo,monospace}
+.prompt{flex:none;display:flex;align-items:center;background:#0f1720;border-radius:6px;margin-top:6px;padding:4px 8px;color:#8ad4ff;font:12px ui-monospace,Menlo,monospace}
 .prompt input{flex:1;min-width:0;background:none;border:0;color:#fff;font:inherit;outline:none;margin-left:6px}.prompt input::placeholder{color:#8f9db0}
 .chips{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.chip{background:var(--chip);border:1px solid var(--chipline);border-radius:12px;padding:2px 9px;font:11px ui-monospace,Menlo,monospace;color:var(--text)}
 .chip:hover{border-color:var(--accent)}.chip.warn{border-style:dashed}
 .note{background:var(--note);border:1px solid var(--line);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;line-height:1.45;margin:8px 0}
 .note ul{margin:4px 0 0;padding-left:16px}.note code{font:11px ui-monospace,Menlo,monospace}
-.row{display:flex;gap:8px;align-items:center;margin-top:6px}.row button{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:3px 10px}
+.row{flex:none;display:flex;gap:8px;align-items:center;margin-top:6px}.row button{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:3px 10px}
 #err{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#2b1416;color:#ffe0dd;border:1px solid #ff8a80;padding:9px 16px;border-radius:8px;display:none;z-index:10;max-width:min(90%,640px);cursor:pointer;line-height:1.4}
 .fatal{max-width:640px;margin:60px auto;padding:20px;font:15px/1.5 sans-serif;border:2px solid var(--b-block);border-radius:10px;background:var(--panel);color:var(--text)}
 @media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
@@ -188,8 +200,8 @@ pre{margin:0;padding:8px;max-height:300px;overflow:auto;background:var(--code);f
 <section id="verdict" aria-label="Trace result" role="status" aria-live="polite"></section>
 
 <aside id="left" aria-label="Scenarios, history and legend">
-  <div class="sec"><h2 id="labtitle">Lab</h2><div class="lab" id="labinfo"></div></div>
-  <div class="sec" id="presetsec"><h2>Scenarios</h2><div id="presets"></div></div>
+  <div class="sec" id="labsec"><h2><button type="button" id="labtoggle" aria-expanded="true" aria-controls="labinfo"><span class="ch" aria-hidden="true">▾</span><span id="labtitle">About this lab</span></button></h2><div class="lab" id="labinfo"></div></div>
+  <div class="sec" id="presetsec"><h2>Scenarios</h2><div id="presets" role="group" aria-label="Scenarios"></div></div>
   <div class="sec"><h2>History</h2><div id="history"><div class="empty" style="padding:0">No traces yet.</div></div></div>
   <div class="sec legend"><h2>Legend</h2>
     <span><i class="g" style="color:var(--t-pass)" aria-hidden="true">✓</i>pass</span><span><i class="g" style="color:var(--t-block)" aria-hidden="true">✕</i>block</span>
@@ -204,7 +216,7 @@ pre{margin:0;padding:8px;max-height:300px;overflow:auto;background:var(--code);f
   <div id="tools" role="group" aria-label="Canvas zoom"><button id="zin" aria-label="Zoom in" title="Zoom in (+)">+</button><button id="zout" aria-label="Zoom out" title="Zoom out (-)">−</button><button id="fit" title="Fit whole topology to the view (F)">Fit</button><button id="focus" title="Zoom to the traced path (Z)">Path</button></div>
   <div id="canvas"><div id="stage"><div class="empty">Loading topology…</div></div></div>
   <div id="hint">Drag to pan · scroll to zoom (Ctrl/⌘+scroll on a stacked layout) · <kbd>F</kbd> fit · Tab to reach devices, Enter to select</div>
-  <div id="pmview"><div class="empty">Run a trace to see its path map.</div></div>
+  <div id="pmview" class="pmbox"><div class="empty">Run a trace to see its path map.</div></div>
   <div id="busy" role="group" tabindex="-1" aria-label="Trace running"><div class="bx"><div class="brow"><div class="spin" aria-hidden="true"></div><span id="busytxt" role="status" aria-live="polite">Tracing…</span></div>
     <button id="cancel2" class="cancelbtn" type="button" title="Cancel the running trace (Esc)">Cancel trace (Esc)</button>
     <div class="bnote">Cancel stops the trace before its next device or API request. A request already sent finishes first (bounded by its timeout), then the trace ends INCOMPLETE and keeps the hops found so far.</div></div></div>
@@ -216,7 +228,7 @@ pre{margin:0;padding:8px;max-height:300px;overflow:auto;background:var(--code);f
     <button class="ctl" id="play" title="Play / pause (Space)" aria-label="Play packet flow">▶</button><button class="ctl" id="next" title="Step (→)" aria-label="Step forward">▶|</button>
     <button class="ctl" id="last" title="Last (End)" aria-label="Last step">⏭</button><button class="ctl" id="replay" title="Replay from source (R)" aria-label="Replay packet flow">↻ Replay</button>
     <input type="range" id="scrub" min="0" max="0" value="0" step="1" aria-label="Position in the trace" disabled>
-    <span id="stepinfo" role="status" aria-live="polite">no trace</span>
+    <span id="stepinfo" role="status" aria-live="polite" title="no trace">no trace</span>
     <span class="sp"></span><label for="speed">speed</label>
     <select id="speed" aria-label="Animation speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option></select>
   </div>
@@ -420,7 +432,10 @@ async function runFlow(body){
   setRunning(true);
   try { const e = await api("/api/trace", {...body, id}); loadEntry(e); refreshHistory(); }
   catch (err) { toast(err.message); }
-  finally { if (S.runId === id) S.runId = null; setRunning(false); }
+  finally { if (S.runId === id) S.runId = null; setRunning(false);
+    // a scenario card started this run: give focus back to it (it was disabled while running), so arrow keys keep working
+    const back = S.returnTo; S.returnTo = null; const a = document.activeElement;
+    if (back && back.isConnected && (!a || a === document.body || a.matches("#run, .cancelbtn"))) back.focus(); }
 }
 // Cancel is cooperative: the server stops the trace before its next request. The /api/trace call then returns the
 // INCOMPLETE result (reason "cancelled by user") with the hops found so far, and the verdict banner announces it.
@@ -471,8 +486,9 @@ function loadEntry(entry, opts = {}){
   const lastIdx = S.steps.length ? S.steps[S.steps.length - 1].pidx : 0;
   if (ov.dest.reached && ov.path.length - 1 > lastIdx) S.steps.push({hop: null, pidx: ov.path.length - 1, final: true});
   renderVerdict(t); renderSummary(entry);
-  renderEvents(); $("#pmview").innerHTML = entry.map_svg; bindPathMap($("#pmview"));
+  renderEvents(); $("#pmview").innerHTML = entry.map_svg; bindPathMap($("#pmview")); fitPm($("#pmview"));
   $$("#presets .preset").forEach(p => { const on = p.dataset.id === entry.preset; p.classList.toggle("on", on); p.setAttribute("aria-pressed", String(on)); });
+  syncPresetTab(); if (!S.labTouched) setLab(false);
   location.hash = `trace=${entry.id}`;
   dimOffPath(true);
   if (opts.fillForm) fillFromTrace(t);
@@ -591,6 +607,7 @@ function reveal(fromK, toK, done){
 }
 function isBad(k){ const st = S.steps[k]; return st && st.hop && st.hop.status === "BLOCK"; }
 function speed(){ return +$("#speed").value; }
+function setStepInfo(t){ const e = $("#stepinfo"); e.textContent = t; e.title = t; }   // ellipsised by CSS; the title carries the full text
 function stepLabel(k){ const st = S.steps[k]; if (!st) return ""; return st.hop ? `${st.hop.status} at ${st.hop.node}` : "destination"; }
 function syncScrub(k){
   const sc = $("#scrub"); sc.disabled = !S.steps.length; sc.max = Math.max(0, S.steps.length - 1); sc.value = k;
@@ -603,19 +620,36 @@ function goto(k, animate = true){
   drawOverlay(k); syncScrub(k);
   $$("#events tr.ev").forEach((r, i) => { r.classList.toggle("cur", i === k); r.classList.toggle("future", i > k); if (i === k) r.setAttribute("aria-current", "step"); else r.removeAttribute("aria-current"); });
   revealRow($$("#events tr.ev")[k], "nearest");
-  $("#stepinfo").textContent = `step ${k + 1} / ${S.steps.length}`;
+  setStepInfo(`step ${k + 1} / ${S.steps.length}`);
   const st = S.steps[k];
   centerPathMap(st.hop ? st.hop.index : null);
   if (st.hop) { selectHop(st.hop.index, false); } else showFinal();
 }
-// The path map is at least 900 px wide; in a narrower panel keep the current hop (and the blocking device) in view.
-function centerPathMap(hopIndex){
-  const box = $("#pmview"); if (!box || box.scrollWidth <= box.clientWidth) return;
-  const el = hopIndex == null ? null : box.querySelector(`.node[data-hop="${CSS.escape(String(hopIndex))}"]`) || box.querySelector(`[data-hop="${CSS.escape(String(hopIndex))}"]`);
-  if (!el) { box.scrollLeft = box.scrollWidth; return; }
-  const b = el.getBoundingClientRect(), v = box.getBoundingClientRect();
-  box.scrollLeft += (b.left + b.width / 2) - (v.left + v.width / 2);
+// Path map sizing. Fit to the panel width when that keeps the labels readable (scale >= PM_MIN_SCALE), never taller than
+// the panel. Otherwise it has to scroll anyway: grow towards actual size to use the height (never below PM_MIN_SCALE) and
+// keep the current hop centred. Smaller than the panel = centred.
+const PM_MIN_SCALE = 0.75;
+function fitPm(box){
+  const svg = box && box.querySelector("svg"); if (!svg) return;
+  const vb = (svg.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number); if (vb.length !== 4 || !(vb[2] > 0) || !(vb[3] > 0)) return;
+  const cs = getComputedStyle(box), aw = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
+    ah = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  if (!(aw > 0) || !(ah > 0)) return;   // hidden
+  const fitW = aw / vb[2], fitH = ah / vb[3];
+  const k = fitW >= PM_MIN_SCALE ? Math.min(fitW, fitH) : Math.max(PM_MIN_SCALE, Math.min(fitH, 1));
+  svg.style.width = (vb[2] * k) + "px"; svg.style.height = (vb[3] * k) + "px";
 }
+function curHopIndex(){ const st = S.steps && S.steps[S.k != null ? S.k : S.steps.length - 1]; return st && st.hop ? st.hop.index : null; }
+function centerPathMap(hopIndex, only){
+  for (const box of only ? [only] : [$("#pmview"), $("#pmi")]) {
+    if (!box || (box.scrollWidth <= box.clientWidth && box.scrollHeight <= box.clientHeight)) continue;
+    const el = hopIndex == null ? null : box.querySelector(`.node[data-hop="${CSS.escape(String(hopIndex))}"]`) || box.querySelector(`[data-hop="${CSS.escape(String(hopIndex))}"]`);
+    if (!el) { box.scrollLeft = box.scrollWidth; continue; }
+    const b = el.getBoundingClientRect(), v = box.getBoundingClientRect();
+    box.scrollLeft += (b.left + b.width / 2) - (v.left + v.width / 2); box.scrollTop += (b.top + b.height / 2) - (v.top + v.height / 2);
+  }
+}
+const refitPm = () => { fitPm($("#pmview")); fitPm($("#pmi")); centerPathMap(curHopIndex()); };
 function play(){
   if (!S.entry || RM.matches) return;
   if (S.playing) { stop(); S.frozen = true; return; }   // pause freezes the stream too
@@ -676,9 +710,10 @@ function highlightHopsAt(nodeId){
 function setTab(t){ S.tab = t; setPressed("#itabs button", "tab", t); renderPane(); }
 function renderPane(){
   const p = $("#ipane");
+  p.classList.toggle("pmtab", S.tab === "pm"); p.classList.remove("devtab");
   if (S.tab === "hop") p.innerHTML = S.hopHtml || `<p class="empty">Step through a trace to inspect each hop: the decision, policy, NAT and the raw read-only requests behind it.</p>`;
   else if (S.tab === "device") renderDevice();
-  else if (S.tab === "pm") { p.innerHTML = S.entry ? `<div style="overflow:auto">${S.entry.map_svg}</div><p class="lab" style="margin-top:8px">Click a device, SG/NACL badge or link to jump to that hop.</p>` : `<p class="empty">No trace yet. Run one to see its path map.</p>`; bindPathMap(p); }
+  else if (S.tab === "pm") { p.innerHTML = S.entry ? `<div class="pmbox" id="pmi">${S.entry.map_svg}</div><p class="lab">Click a device, SG/NACL badge or link to jump to that hop.</p>` : `<p class="empty">No trace yet. Run one to see its path map.</p>`; bindPathMap(p); fitPm($("#pmi")); centerPathMap(curHopIndex(), $("#pmi")); }
   else if (S.tab === "json") p.innerHTML = S.entry ? `<pre style="max-height:none">${esc(JSON.stringify(S.entry.trace, null, 2))}</pre>` : `<p class="empty">No trace yet.</p>`;
 }
 function bindPathMap(root){ root.querySelectorAll("[data-hop]").forEach(el => el.addEventListener("click", () => {
@@ -694,7 +729,7 @@ function selectHop(idx, switchTab = true){
   const ev = (h.evidence || []).map(e => `<details class="ev"><summary>[${esc(e.source)}] ${esc(e.request)}</summary><pre>${esc(e.response)}</pre></details>`).join("");
   S.hopHtml = `<h3>#${esc(h.index)} ${esc(h.node)}</h3><p class="lead">${esc(h.summary)}</p><dl class="kv">${rows}</dl>`
     + (det ? `<b>Details</b><ul class="det">${det}</ul>` : "")
-    + `<b>Evidence</b> <span class="lab">: read-only requests nettrace sent and what came back</span>` + (ev || `<p class="empty" style="padding:6px 0">none recorded</p>`);
+    + `<b>Evidence</b> <span class="lab">· read-only requests nettrace sent and what came back</span>` + (ev || `<p class="empty" style="padding:6px 0">none recorded</p>`);
   if (switchTab || S.tab === "hop") { if (S.tab !== "hop" && switchTab) setTab("hop"); else renderPane(); }
 }
 function showFinal(){ const t = S.entry.trace, n = S.nodes[S.entry.overlay.dest.node];
@@ -705,7 +740,7 @@ document.addEventListener("click", e => { const a = e.target.closest("a[data-nod
 function selectNode(id){
   S.sel = id; $$("#topo .node").forEach(n => n.classList.toggle("sel", n.dataset.node === id)); setTab("device");
   if (S.entry) { const c = highlightHopsAt(id), n = S.nodes[id];
-    if (n) $("#stepinfo").textContent = c ? `${n.label}: ${c} hop${c > 1 ? "s" : ""} in this trace` : `${n.label}: not on this path`; }
+    if (n) setStepInfo(c ? `${n.label}: ${c} hop${c > 1 ? "s" : ""} in this trace` : `${n.label}: not on this path`); }
 }
 
 /* ===== K. device pane + read-only console ===== */
@@ -748,14 +783,14 @@ function deviceHops(n){
   if (!S.entry) return ""; const hn = S.entry.overlay.hop_nodes, here = S.entry.trace.Hops.filter(h => hn[String(h.index)] === n.id);
   return here.length ? `<b>Hops here in this trace</b><ul class="det">` + here.map(h => `<li><a href="#" data-step="${esc(h.index)}">${badge(h.status)}</a> ${esc(h.component)}: ${esc(h.summary)}</li>`).join("") + `</ul>` : "";
 }
-function consoleHtml(devName, dev, prompt, c){
+function consoleHtml(devName, dev, prompt, c){   // returns [scrolling top part, pinned bottom part]
   const writeCmd = dev.platform === "cisco_iosxe" ? "configure terminal" : "<request><restart><system/></restart></request>";
-  return `<h4 style="margin:12px 0 4px;font-size:13px">Console <span class="lab">(${S.boot.mode === "demo" ? "simulated device" : "live device"})</span></h4>${consoleNotice(dev)}
+  return [`<h4 style="margin:12px 0 4px;font-size:13px">Console <span class="lab">(${S.boot.mode === "demo" ? "simulated device" : "live device"})</span></h4>${consoleNotice(dev)}
     <div class="chips" role="group" aria-label="Example commands">${dev.quick.map(q => `<button type="button" class="chip" data-cmd="${esc(q)}" title="${esc(q)}">${esc(q.length > 38 ? q.slice(0, 36) + "…" : q)}</button>`).join("")}
-    <button type="button" class="chip warn" data-cmd="${esc(writeCmd)}" title="Try a write: the read-only guard refuses it">try a write (will be refused)</button></div>
-    <div class="term" id="term" role="log" aria-live="polite" aria-label="Console output for ${esc(devName)}" tabindex="0">${c.lines.join("") || `<span class="muted">Connected to ${esc(devName)} (${esc(dev.platform)}). Type a command or pick one above.</span>`}</div>
+    <button type="button" class="chip warn" data-cmd="${esc(writeCmd)}" title="Try a write: the read-only guard refuses it">try a write (will be refused)</button></div>`,
+    `<div class="term" id="term" role="log" aria-live="polite" aria-label="Console output for ${esc(devName)}" tabindex="0">${c.lines.join("") || `<span class="muted">Connected to ${esc(devName)} (${esc(dev.platform)}). Type a command or pick one above.</span>`}</div>
     <div class="prompt"><span aria-hidden="true">${esc(prompt)}</span><input id="cmd" autocomplete="off" spellcheck="false" aria-label="Console command for ${esc(devName)}" maxlength="400" placeholder="${dev.platform === "cisco_iosxe" ? "show ip route 10.20.1.50" : "show routing route"}"></div>
-    <div class="row"><button type="button" id="copy">Copy output</button><button type="button" id="clearterm">Clear</button><span class="lab">Up/Down arrows recall earlier commands.</span></div>`;
+    <div class="row"><button type="button" id="copy">Copy output</button><button type="button" id="clearterm">Clear</button><span class="lab">Up/Down arrows recall earlier commands.</span></div>`];
 }
 function bindConsole(devName, dev, n, prompt){
   const term = $("#term"); term.scrollTop = term.scrollHeight;
@@ -776,17 +811,19 @@ function bindConsole(devName, dev, n, prompt){
   $("#clearterm").onclick = () => { c.lines = []; renderDevice(); };
 }
 function renderDevice(){
-  const p = $("#ipane"), n = S.nodes[S.sel];
+  const p = $("#ipane"), n = S.nodes[S.sel], keep = p.querySelector(".devscroll"), keepTop = keep ? keep.scrollTop : 0;
+  p.classList.remove("devtab", "pmtab");
   if (!n) { p.innerHTML = `<p class="empty">Click a device on the topology (or Tab to it and press Enter) to see its details${S.boot.mode === "demo" ? " and open a read-only console" : ""}.</p>`; return; }
   const devName = (n.devices || []).find(d => S.boot.devices[d]), dev = devName ? S.boot.devices[devName] : null;
   const prompt = dev ? (dev.platform === "cisco_iosxe" ? `${devName}#` : `admin@${devName}>`) : "";
   let html = `<div class="devhead"><svg viewBox="-30 -30 60 60" aria-hidden="true">${S.boot.icons[n.kind] || S.boot.icons.generic}</svg><div><h3>${esc(n.label)}</h3><div class="lab">${esc(n.sub || "")}</div></div></div>
     <dl class="kv">${deviceFacts(n, dev)}</dl>${deviceHops(n)}`;
-  if (dev) html += consoleHtml(devName, dev, prompt, S.console[devName] || (S.console[devName] = {lines: [], hist: [], hi: 0}));
+  if (dev) { const [top, bottom] = consoleHtml(devName, dev, prompt, S.console[devName] || (S.console[devName] = {lines: [], hist: [], hi: 0}));
+    html = `<div class="devscroll">${html}${top}</div>${bottom}`; p.classList.add("devtab"); }
   else if (n.kind !== "external") html += `<div class="note">${n.vpcs || n.ids ? "AWS components have no console: nettrace reads them with Describe/Search API calls during a trace. Each hop's evidence shows the exact calls." : "This node represents addresses, not a managed device."}</div>`;
   p.innerHTML = html;
   p.querySelectorAll("a[data-step]").forEach(a => a.onclick = e => { e.preventDefault(); const i = S.steps.findIndex(s => s.hop && s.hop.index == a.dataset.step); stop(); goto(i); setTab("hop"); });
-  if (dev) bindConsole(devName, dev, n, prompt);
+  if (dev) { bindConsole(devName, dev, n, prompt); const d = p.querySelector(".devscroll"); if (d) d.scrollTop = keepTop; }
 }
 
 /* ===== L. left panel: scenarios + history ===== */
@@ -794,7 +831,7 @@ const EXPECT_TEXT = {REACHABLE:"expect reachable", BLOCKED:"expect blocked", EXI
 function renderLeft(){
   const b = S.boot;
   $("#mode").className = "mode " + b.mode; $("#mode").textContent = b.mode === "demo" ? "DEMO LAB · SIMULATED" : "LIVE · READ-ONLY";
-  $("#ver").textContent = "v" + b.version; $("#labtitle").textContent = b.mode === "demo" ? "Lab" : "Inventory";
+  $("#ver").textContent = "v" + b.version; $("#labtitle").textContent = b.mode === "demo" ? "About this lab" : "About this inventory";
   $("#labinfo").innerHTML = b.mode === "demo"
     ? `<b>${esc(b.title)}</b><br>Simulated IOS-XE, PAN-OS + Panorama, Prisma Access and 3 AWS accounts. The real nettrace drivers, engine and read-only guards run unchanged; only the transports are simulated.`
     : `<b>${esc(b.title)}</b><br>Traces query your real devices and AWS accounts with read-only requests. Topology is generated from the inventory.`;
@@ -803,9 +840,22 @@ function renderLeft(){
   $("#presets").innerHTML = ps.map(p => `<button type="button" class="preset ${esc(p.expect)}" data-id="${esc(p.id)}" aria-pressed="false" title="${esc(p.story)}"><div class="t">${esc(p.title)}</div>`
     + `<div class="s">${esc(p.flow.src)} → ${esc(p.flow.dst)}:${esc(p.flow.port ?? "")}/${esc(p.flow.protocol)}</div>`
     + `<div class="x"><span aria-hidden="true">${esc(OGLYPH[p.expect] || "?")}</span> ${esc(EXPECT_TEXT[p.expect] || "expect " + String(p.expect).toLowerCase())}</div></button>`).join("");
-  $$("#presets .preset").forEach(el => el.onclick = () => runPreset(el.dataset.id));
+  $$("#presets .preset").forEach(el => el.onclick = () => { S.returnTo = el; runPreset(el.dataset.id); });
+  syncPresetTab();
   const sel = $("#f-start"); Object.keys(b.devices).forEach(d => { const o = document.createElement("option"); o.value = d; o.textContent = d; sel.appendChild(o); });
 }
+// About-this-lab toggle: open until the first trace has loaded, then collapsed (unless the user chose a state themselves)
+function setLab(open, byUser){ if (byUser) S.labTouched = true; $("#labinfo").hidden = !open; $("#labtoggle").setAttribute("aria-expanded", String(open)); $("#labtoggle .ch").textContent = open ? "▾" : "▸"; }
+$("#labtoggle").addEventListener("click", () => setLab($("#labtoggle").getAttribute("aria-expanded") !== "true", true));
+// Scenario cards behave as one group: a single Tab stop (the selected card, else the first), arrow keys move between cards.
+function syncPresetTab(){ const ps = $$("#presets .preset"), on = ps.find(p => p.classList.contains("on")) || ps[0]; ps.forEach(p => p.tabIndex = p === on ? 0 : -1); }
+$("#presets").addEventListener("keydown", e => {
+  const ps = $$("#presets .preset"), i = ps.indexOf(document.activeElement); if (i < 0) return;
+  const to = {ArrowDown: i + 1, ArrowRight: i + 1, ArrowUp: i - 1, ArrowLeft: i - 1, Home: 0, End: ps.length - 1}[e.key];
+  if (to === undefined) return;
+  e.preventDefault(); e.stopPropagation();   // arrows move between cards here; they do not step the trace
+  const t = ps[Math.max(0, Math.min(ps.length - 1, to))]; ps.forEach(p => p.tabIndex = p === t ? 0 : -1); t.focus();
+});
 async function refreshHistory(){
   const h = await api("/api/traces").catch(() => []);
   $("#history").innerHTML = h.length ? h.map(x => `<button type="button" class="hist" data-id="${esc(x.id)}" title="${esc(x.outcome)}"><span class="og ${esc(x.outcome)}" aria-hidden="true">${esc(OGLYPH[x.outcome] || "?")}</span><span class="sr">${esc(x.outcome)}</span><span class="lab">${esc(x.created)}</span> <span class="tt">${esc(x.title)}</span></button>`).join("")
@@ -815,8 +865,8 @@ async function refreshHistory(){
 
 /* ===== M. view switching + keyboard + startup ===== */
 function setView(v){ S.view = v; setPressed("#tabs .tab", "view", v);
-  $("#pmview").style.display = v === "pm" ? "block" : "none"; $("#canvas").style.display = v === "topo" ? "" : "none"; $("#tools").style.display = v === "topo" ? "" : "none"; $("#hint").style.display = v === "topo" ? "" : "none";
-  if (v === "pm" && S.steps && S.steps.length) { const st = S.steps[S.k != null ? S.k : S.steps.length - 1]; centerPathMap(st && st.hop ? st.hop.index : null); } }
+  $("#pmview").style.display = v === "pm" ? "flex" : "none"; $("#canvas").style.display = v === "topo" ? "" : "none"; $("#tools").style.display = v === "topo" ? "" : "none"; $("#hint").style.display = v === "topo" ? "" : "none";
+  if (v === "pm") { fitPm($("#pmview")); if (S.steps && S.steps.length) centerPathMap(curHopIndex(), $("#pmview")); } }
 $$("#tabs .tab").forEach(t => t.onclick = () => setView(t.dataset.view));
 $$("#itabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
 $("#skip").onclick = e => { e.preventDefault(); $("#ws").focus(); };
@@ -830,7 +880,8 @@ $("#scrub").addEventListener("input", e => stepTo(+e.target.value, false));
 const rmSync = () => { stop(); $("#play").disabled = RM.matches; $("#play").title = RM.matches ? "Auto-play is off (reduced motion): use the step buttons" : "Play / pause (Space)"; };
 RM.addEventListener("change", rmSync); rmSync();
 $("#fit").onclick = fit; $("#focus").onclick = focusPath; $("#zin").onclick = () => zoomCentre(1.25); $("#zout").onclick = () => zoomCentre(0.8);
-addEventListener("resize", () => S.entry ? focusPath() : fit());
+addEventListener("resize", () => { S.entry ? focusPath() : fit(); refitPm(); });
+if (window.ResizeObserver) { const ro = new ResizeObserver(refitPm); ro.observe($("#pmview")); ro.observe($("#ipane")); }
 // Global shortcuts. Controls that own Space/Enter (buttons, links, rows, nodes, inputs) keep them.
 addEventListener("keydown", e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
