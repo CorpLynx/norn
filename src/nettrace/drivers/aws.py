@@ -4,6 +4,7 @@ NAT gateways, VPC peering. Multi-account via sts:AssumeRole. Exact read-only all
 
 from __future__ import annotations
 
+import contextvars
 import ipaddress
 import json
 import os
@@ -21,7 +22,7 @@ from nettrace.inventory import AwsAccount, Inventory
 from nettrace.models import Evidence, Flow, Hop, Outcome, Status
 from nettrace.netutil import DEFAULT_EPHEMERAL_PORT, protocol_number
 from nettrace.readonly import check_aws_operation, install_aws_guard
-from nettrace.steps import AwsAt, DeviceAt, PrismaAt, StepResult
+from nettrace.steps import AwsAt, DeviceAt, PrismaAt, StepResult, ipv6_unknown
 
 MAX_AWS_STEPS = 40
 ASSUME_DURATION = 900  # seconds; the shortest STS allows. Expired sessions are re-assumed once.
@@ -219,8 +220,10 @@ class AwsEnv:
         if len(targets) == 1:
             hits = [probe(targets[0])]
         else:
+            # each worker runs in a copy of this thread's context, so audit labels (mode, direction) carry over
+            ctxs = [contextvars.copy_context() for _ in targets]
             with ThreadPoolExecutor(max_workers=min(16, len(targets) or 1)) as pool:
-                hits = list(pool.map(probe, targets))
+                hits = list(pool.map(lambda pair: pair[0].run(probe, pair[1]), zip(ctxs, targets, strict=True)))
         found: dict[tuple[str, str], tuple[str, str, dict[str, Any]]] = {}
         for hit in (h for hs in hits for h in hs):  # the same ENI seen from two accounts (shared subnets) counts once
             found.setdefault((hit[1], hit[2]["NetworkInterfaceId"]), hit)
@@ -510,6 +513,9 @@ class AwsWalker:
 
     # ---- entry points -----------------------------------------------------------------------------
     def walk(self, at: AwsAt, flow: Flow) -> StepResult:
+        v6 = ipv6_unknown(flow, "aws", at.resource_id or at.ip or "aws", "vpc")  # SG/NACL/route code reads IPv4 CIDRs only
+        if v6:
+            return v6
         hops: list[Hop] = []
         warnings: list[str] = []
         self._mark = len(self.env.evidence)

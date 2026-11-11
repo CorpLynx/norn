@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from nettrace import audit
+from nettrace import audit, symmetry
 from nettrace.drivers import cisco_iosxe, panos, prisma
 from nettrace.errors import CancelToken, Cancelled, Deadline, NetTraceError, ReadOnlyViolation
 from nettrace.inventory import Device, Inventory, LinkEnd
@@ -227,6 +227,39 @@ class Tracer:
 
     # ---- main loop ---------------------------------------------------------------------------------
     def trace(self, flow: Flow, start_at: str | None = None) -> TraceResult:
+        return self._trace(flow, start_at, close=True)
+
+    def trace_with_return(self, flow: Flow, start_at: str | None = None) -> TraceResult:
+        """Forward trace, then (only if it ended REACHABLE) the reverse trace and a symmetry comparison.
+
+        Both traces run on this Tracer: one time budget (the return trace gets what is left of it), one cancel token,
+        and the same read-only drivers and connections. A forward trace that did not end REACHABLE gets no return
+        trace (Symmetry NOT_RUN) because there is no complete path to compare:
+        BLOCKED / INCOMPLETE: the forward path is not established; EXITED: the destination is outside the networks
+        nettrace knows, so the reverse trace would start from an address it cannot locate or evaluate.
+        The result keeps the forward Outcome; the return verdict is in `return_path` (see output.exit_code)."""
+        try:
+            with audit.direction("forward"):
+                fwd = self._trace(flow, start_at, close=False)
+            if fwd.outcome != Outcome.REACHABLE:
+                why = "cancelled by user" if fwd.cancelled else f"the forward trace ended {fwd.outcome.value}"
+                fwd.return_path = symmetry.not_run(fwd, f"return trace not run: {why}")
+                return fwd
+            rflow, notes = symmetry.return_flow(fwd)
+            self.progress(f"tracing the return path {rflow.describe()}")
+            keep, self.check_return = self.check_return, False  # the AWS return-NACL check is this trace
+            try:
+                with audit.direction("return"):
+                    rres = self._trace(rflow, None, close=False)
+            finally:
+                self.check_return = keep
+            fwd.return_path = symmetry.compare(fwd, rflow, rres, notes)
+            fwd.warnings = list(dict.fromkeys(fwd.warnings + symmetry.forward_warnings(fwd.return_path)))
+            return fwd
+        finally:
+            self.clients.close()
+
+    def _trace(self, flow: Flow, start_at: str | None, *, close: bool) -> TraceResult:
         original = flow
         hops: list[Hop] = []
         warnings: list[str] = []
@@ -290,7 +323,8 @@ class Tracer:
             else:
                 outcome, reason = Outcome.INCOMPLETE, _failure(exc)
         finally:
-            self.clients.close()
+            if close:
+                self.clients.close()
 
         if cancelled:  # keep the hops found so far; never a verified result
             self.cancel.cancel()

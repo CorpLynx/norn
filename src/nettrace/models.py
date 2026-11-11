@@ -26,6 +26,13 @@ class Outcome(str, Enum):
     INCOMPLETE = "INCOMPLETE"  # could not finish the trace
 
 
+class SymmetryStatus(str, Enum):
+    SYMMETRIC = "SYMMETRIC"  # both directions crossed the same devices (and the same interfaces / zones / members)
+    ASYMMETRIC = "ASYMMETRIC"  # the return path differs from the forward path; see the details
+    UNKNOWN = "UNKNOWN"  # could not be decided (a direction is unverified); never read as symmetric
+    NOT_RUN = "NOT_RUN"  # no return trace was run (forward trace did not end REACHABLE)
+
+
 @dataclass
 class Flow:
     src: str
@@ -96,6 +103,25 @@ class Hop:
 
 
 @dataclass
+class Symmetry:
+    status: SymmetryStatus
+    details: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ReturnPath:
+    """The optional reverse trace (destination back to source) and its comparison with the forward path."""
+
+    flow: Flow  # the flow that was (or would have been) traced: src/dst swapped, ports swapped
+    outcome: Outcome | None  # None = not run
+    reason: str
+    symmetry: Symmetry
+    hops: list[Hop] = field(default_factory=list)  # numbered after the forward hops, so an index is unique per result
+    warnings: list[str] = field(default_factory=list)
+    cancelled: bool = False  # the user cancelled during the return trace (the forward result stands)
+
+
+@dataclass
 class TraceResult:
     flow: Flow
     outcome: Outcome
@@ -104,6 +130,7 @@ class TraceResult:
     warnings: list[str] = field(default_factory=list)
     final_flow: Flow | None = None
     cancelled: bool = False  # the user cancelled; outcome is INCOMPLETE and hops are those found before that
+    return_path: ReturnPath | None = None  # only with --return / "return": true
 
     def to_dict(self) -> dict[str, Any]:
         def convert(value: Any) -> Any:
@@ -128,4 +155,16 @@ class TraceResult:
             data["Cancelled"] = True
         if self.final_flow and self.final_flow != self.flow:
             data["FinalFlow"] = convert(self.final_flow)
+        if self.return_path is not None:  # additive: absent unless the return trace was asked for
+            r = self.return_path
+            data["Return"] = {
+                "Flow": convert(r.flow),
+                "Outcome": r.outcome.value if r.outcome else None,
+                "Reason": r.reason,
+                "Hops": [convert(h) for h in r.hops],
+                "Warnings": list(r.warnings),
+                "Symmetry": {"status": r.symmetry.status.value, "details": list(r.symmetry.details)},
+            }
+            if r.cancelled:
+                data["Return"]["Cancelled"] = True
         return data

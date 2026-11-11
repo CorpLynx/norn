@@ -44,6 +44,7 @@ from nettrace.errors import CancelToken, NetTraceError, ReadOnlyViolation
 from nettrace.inventory import Inventory
 from nettrace.models import Flow, truncate
 from nettrace.netutil import PROTOCOL_NUMBERS
+from nettrace.output import exit_code
 from nettrace.web.topology import auto_topology, overlay
 
 MAX_BODY = 64 * 1024
@@ -152,6 +153,9 @@ class App:
         from nettrace.viz import build_map, render_svg
 
         flow, start_at = self._flow(body)
+        with_return = body.get("return", False)
+        if not isinstance(with_return, bool):  # strict: "false" / 0 / null must not silently switch the doubled queries on
+            raise BadRequest("return: must be true or false")
         run_id = body.get("id")
         if run_id is None:
             run_id = secrets.token_hex(8)
@@ -167,7 +171,8 @@ class App:
                 raise BadRequest("another trace is running; try again in a moment", HTTPStatus.TOO_MANY_REQUESTS)
             try:
                 started = time.time()
-                result = Tracer(self.inv, cancel=token).trace(flow, start_at=start_at)
+                tracer = Tracer(self.inv, cancel=token)
+                result = tracer.trace_with_return(flow, start_at=start_at) if with_return else tracer.trace(flow, start_at=start_at)
             finally:
                 self.trace_slots.release()
         finally:
@@ -180,8 +185,14 @@ class App:
             "title": f"{flow.src} → {flow.dst}{port} {flow.protocol}", "preset": body.get("preset"),
             "run_id": run_id, "cancelled": result.cancelled,
             "trace": trace, "overlay": overlay(self.topology, trace),
-            "map_svg": render_svg(build_map(trace), header=False),
+            "map_svg": render_svg(build_map(trace), header=False),  # forward path only
         }
+        ret = trace.get("Return")
+        if ret:
+            entry["title"] += " + return"
+            entry["exit_code"] = exit_code(result)
+            if ret.get("Hops"):  # the same mapping onto the topology, for the second packet stream
+                entry["return_overlay"] = overlay(self.topology, {k: ret[k] for k in ("Flow", "Hops", "Outcome", "Reason")})
         with self.history_lock:
             tid = secrets.token_hex(4)
             while tid in self.history:  # ids are unique

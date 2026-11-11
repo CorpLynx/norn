@@ -39,6 +39,10 @@ CISCO: dict[str, dict[str, Any]] = {
             {"name": "GigabitEthernet1", "ip": "10.0.0.1/30", "desc": "to fw-dc1 ethernet1/1"},
             {"name": "GigabitEthernet2", "ip": "10.1.10.1/24", "desc": "USERS vlan 10", "acl_in": "USERS-IN"},
             {"name": "GigabitEthernet3", "ip": "10.1.20.1/24", "desc": "SERVERS vlan 20", "acl_out": "SERVERS-OUT"},
+            # "nat" / "zone" / "inspect" feed `show ip nat statistics` / `show zone security` /
+            # `show ip inspect interfaces` in sim_cisco. Only the guest VLAN uses one, so the other presets keep
+            # their outcome; nettrace does not evaluate NAT, so a flow from here is UNKNOWN (preset guest-nat).
+            {"name": "GigabitEthernet4", "ip": "10.1.40.1/24", "desc": "GUEST vlan 40 (NAT inside)", "nat": "inside"},
             {"name": "Tunnel200", "ip": "169.254.200.2/30", "desc": "Prisma Access SC-US-East"},
             {"name": "Loopback0", "ip": "10.255.0.1/32", "desc": "router-id"},
         ],
@@ -86,6 +90,11 @@ PANOS: dict[str, dict[str, Any]] = {
             {"name": "allow-corp-to-aws", "from": ["trust"], "to": ["vpn-aws"],
              "source": ["10.1.0.0/16", "10.50.0.0/16", "100.64.0.0/16"], "destination": ["10.20.0.0/16", "10.30.0.0/16"],
              "application": ["any"], "service": ["any"], "action": "allow"},
+            # nettrace evaluates a return flow as a NEW session (it does not read session tables), so the lab has
+            # explicit rules for the reply direction; a real firewall also lets replies of an allowed session through.
+            {"name": "allow-aws-reply-to-corp", "from": ["vpn-aws"], "to": ["trust"],
+             "source": ["10.20.0.0/16", "10.30.0.0/16"], "destination": ["10.1.0.0/16", "10.50.0.0/16", "100.64.0.0/16"],
+             "application": ["any"], "service": ["any"], "action": "allow"},
             {"name": "allow-web-inbound", "from": ["untrust"], "to": ["dmz"], "source": ["any"],
              "destination": ["203.0.113.10"], "application": ["ssl", "web-browsing"],
              "service": ["application-default"], "action": "allow"},
@@ -121,6 +130,9 @@ PANOS: dict[str, dict[str, Any]] = {
             {"name": "allow-corp-to-prod-web", "from": ["from-tgw"], "to": ["to-tgw"],
              "source": ["10.0.0.0/8", "100.64.0.0/16"], "destination": ["10.20.1.0/24"],
              "application": ["any"], "service": ["tcp/443", "tcp/80"], "action": "allow"},
+            {"name": "allow-prod-reply-to-corp", "from": ["from-tgw"], "to": ["to-tgw"],
+             "source": ["10.20.0.0/16"], "destination": ["10.1.0.0/16", "10.50.0.0/16", "100.64.0.0/16"],
+             "application": ["any"], "service": ["any"], "action": "allow"},
             {"name": "allow-prod-to-shared-dns", "from": ["from-tgw"], "to": ["to-tgw"],
              "source": ["10.20.0.0/16"], "destination": ["10.30.1.53"], "application": ["dns"],
              "service": ["application-default"], "action": "allow"},
@@ -237,7 +249,10 @@ def _aws_model() -> dict[str, Any]:
 
     nacls = [
         nacl("insp-default", ACCT_NET, VPC_INSP, ["insp-tgw", "insp-fw-trust", "insp-fw-untrust"], default_entries()),
-        nacl("prod-default", ACCT_PROD, VPC_PROD, ["prod-app", "prod-tgw"], default_entries()),
+        # prod-default also has an outbound deny to the branch-12 prefix (preset return-blocked): the request gets in,
+        # the reply is dropped. NACLs are stateless, so this is a real block of the return direction.
+        nacl("prod-default", ACCT_PROD, VPC_PROD, ["prod-app", "prod-tgw"],
+             [entry(90, True, "deny", "10.50.12.0/24"), *default_entries()]),
         nacl("prod-db-nacl", ACCT_PROD, VPC_PROD, ["prod-db"], [
             entry(100, False, "allow", "10.20.1.0/24", "6", (5432, 5432)), entry(32767, False, "deny", "0.0.0.0/0"),
             entry(100, True, "allow", "10.20.1.0/24", "6", (1024, 65535)), entry(32767, True, "deny", "0.0.0.0/0")]),
@@ -314,7 +329,10 @@ def _aws_model() -> dict[str, Any]:
                 "TransitGatewayAttachments": [{"TransitGatewayAttachmentId": att_id, "ResourceType": rtype, "ResourceId": res}]}
 
     tgw_routes = {
-        TGW_RT_SPOKES: [tgw_route("0.0.0.0/0", ATT_INSP, "vpc", VPC_INSP, "static")],
+        # 10.1.20.0/24 (DC servers) has a static route straight to the VPN: replies from a spoke to it skip the
+        # inspection VPC (preset return-asymmetric). Requests from the DC still enter through inspection (0.0.0.0/0).
+        TGW_RT_SPOKES: [tgw_route("0.0.0.0/0", ATT_INSP, "vpc", VPC_INSP, "static"),
+                        tgw_route("10.1.20.0/24", ATT_VPN, "vpn", rid("vpn", "dc1"), "static")],
         TGW_RT_INSPECTION: [
             tgw_route("10.20.0.0/16", ATT_PROD, "vpc", VPC_PROD), tgw_route("10.30.0.0/16", ATT_SHARED, "vpc", VPC_SHARED),
             tgw_route("10.1.0.0/16", ATT_VPN, "vpn", rid("vpn", "dc1")), tgw_route("10.50.0.0/16", ATT_VPN, "vpn", rid("vpn", "dc1")),
@@ -359,6 +377,7 @@ networks:
   - {{prefix: 10.1.10.0/24, gateway: core-rtr1}}
   - {{prefix: 10.1.20.0/24, gateway: core-rtr1}}
   - {{prefix: 10.1.30.0/24, gateway: fw-dc1}}
+  - {{prefix: 10.1.40.0/24, gateway: core-rtr1}}
 aws:
   regions: [{REGION}]
   accounts:
@@ -424,6 +443,28 @@ PRESETS: list[dict[str, Any]] = [
     {"id": "dc-telnet", "title": "DC user telnet → server", "expect": "BLOCKED",
      "story": "Denied by the inbound ACL on the users VLAN of core-rtr1.",
      "flow": {"src": "10.1.10.25", "dst": "10.1.20.10", "port": 23, "protocol": "tcp"}},
+    {"id": "guest-nat", "title": "Guest Wi-Fi → Internet (NAT on the router)", "expect": "INCOMPLETE",
+     "story": "core-rtr1 has `ip nat inside` on the guest VLAN. nettrace does not evaluate NAT, so the router hop "
+              "is UNKNOWN (the real addresses may differ) and the otherwise clean path ends INCOMPLETE.",
+     "flow": {"src": "10.1.40.25", "dst": "8.8.8.8", "port": 443, "protocol": "tcp"}},
+    {"id": "ipv6-not-evaluated", "title": "IPv6 flow through core-rtr1", "expect": "INCOMPLETE",
+     "story": "nettrace evaluates IPv4 only. An IPv6 flow gets an UNKNOWN hop (\"IPv6 is not evaluated\"); "
+              "no IPv4 logic runs on it.",
+     "flow": {"src": "2001:db8:10::25", "dst": "2001:db8:20::10", "port": 443, "protocol": "tcp",
+              "start_at": "core-rtr1"}},
+    {"id": "return-symmetric", "title": "DC user → prod web, with return path", "expect": "REACHABLE",
+     "story": "Same path as the first scenario, plus the reverse trace (prod web back to the DC user). Both "
+              "directions cross core-rtr1, fw-dc1 and fw-aws-1 on the same interfaces: SYMMETRIC.",
+     "flow": {"src": "10.1.10.25", "dst": "10.20.1.50", "port": 443, "protocol": "tcp", "return": True}},
+    {"id": "return-asymmetric", "title": "DC server → prod web, asymmetric return", "expect": "REACHABLE",
+     "story": "The request goes through the inspection VPC (fw-aws-1), but a static TGW route sends the reply "
+              "from the spoke straight to the VPN: fw-aws-1 only ever sees one direction. ASYMMETRIC, exit 0 "
+              "with a warning.",
+     "flow": {"src": "10.1.20.10", "dst": "10.20.1.50", "port": 443, "protocol": "tcp", "return": True}},
+    {"id": "return-blocked", "title": "Branch → prod web, reply blocked", "expect": "REACHABLE",
+     "story": "The request is allowed end to end, but the stateless NACL on the prod-app subnet denies outbound "
+              "traffic to the branch prefix, so the reply never leaves. Forward REACHABLE, return BLOCKED: exit 3.",
+     "flow": {"src": "10.50.12.40", "dst": "10.20.1.50", "port": 443, "protocol": "tcp", "return": True}},
     {"id": "web-to-db", "title": "Prod web → database", "expect": "REACHABLE",
      "story": "Inside one VPC: NACL on the DB subnet and an SG that references the web-tier SG.",
      "flow": {"src": "10.20.1.50", "dst": "10.20.2.10", "port": 5432, "protocol": "tcp"}},
@@ -461,6 +502,8 @@ TOPOLOGY: dict[str, Any] = {
          "cidrs": ["0.0.0.0/0"]},
         {"id": "users-lan", "label": "Users VLAN 10", "sub": "10.1.10.0/24", "kind": "lan", "x": 130, "y": 520,
          "group": "g-dc1", "cidrs": ["10.1.10.0/24"]},
+        {"id": "guest-lan", "label": "Guest VLAN 40", "sub": "10.1.40.0/24 · NAT inside", "kind": "lan", "x": 130,
+         "y": 620, "group": "g-dc1", "cidrs": ["10.1.40.0/24"]},
         {"id": "servers-lan", "label": "Servers VLAN 20", "sub": "10.1.20.0/24", "kind": "lan", "x": 130, "y": 720,
          "group": "g-dc1", "cidrs": ["10.1.20.0/24"]},
         {"id": "fs01", "label": "fs01", "sub": "file / intranet · 10.1.20.10", "kind": "host", "x": 130, "y": 880,
@@ -498,6 +541,7 @@ TOPOLOGY: dict[str, Any] = {
         {"a": "prisma-access", "b": "core-rtr1", "label": "SC-US-East", "b_if": "Tu200", "kind": "tunnel"},
         {"a": "users-lan", "b": "core-rtr1", "b_if": "Gi2"},
         {"a": "servers-lan", "b": "core-rtr1", "b_if": "Gi3"},
+        {"a": "guest-lan", "b": "core-rtr1", "b_if": "Gi4"},
         {"a": "fs01", "b": "servers-lan"},
         {"a": "core-rtr1", "b": "fw-dc1", "a_if": "Gi1", "b_if": "e1/1"},
         {"a": "fw-dc1", "b": "dmz-lan", "a_if": "e1/3"},

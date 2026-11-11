@@ -21,6 +21,7 @@ from typing import Any
 DEFAULT_PATH = "~/.local/state/nettrace/audit.log"
 MAX_REQUEST = 1000  # characters kept per request
 _mode: contextvars.ContextVar[str] = contextvars.ContextVar("nettrace_audit_mode", default="trace")
+_direction: contextvars.ContextVar[str | None] = contextvars.ContextVar("nettrace_audit_direction", default=None)
 _handlers: dict[str, RotatingFileHandler] = {}
 _demo = False  # set by the demo lab: records then carry demo=true so they are not read as real device activity
 
@@ -54,6 +55,17 @@ def mode(name: str) -> Iterator[None]:
         _mode.reset(token)
 
 
+@contextlib.contextmanager
+def direction(name: str) -> Iterator[None]:
+    """Label records written inside the block `forward` or `return`. Only set when a return trace was asked for,
+    so ordinary (forward-only) records are unchanged."""
+    token = _direction.set(name)
+    try:
+        yield
+    finally:
+        _direction.reset(token)
+
+
 def _handler() -> RotatingFileHandler:
     path = os.path.expanduser(os.environ.get("NETTRACE_AUDIT_LOG") or DEFAULT_PATH)
     if path not in _handlers:
@@ -79,6 +91,8 @@ def log(kind: str, device: str, request: str, status: str) -> None:
             user = "?"
         record = {"ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "pid": os.getpid(), "user": user, "mode": _mode.get(),
                   "device": device, "kind": kind, "request": str(request)[:MAX_REQUEST], "status": status}
+        if _direction.get():
+            record["direction"] = _direction.get()
         if _demo:
             record["demo"] = True
         _handler().handle(logging.makeLogRecord({"msg": json.dumps(record), "levelno": logging.INFO}))

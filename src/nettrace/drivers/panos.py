@@ -21,12 +21,13 @@ from defusedxml import ElementTree as SafeET
 
 from nettrace import audit
 from nettrace.credentials import env_value
+from nettrace.drivers.panos_routing import explain_missing_route
 from nettrace.errors import Deadline, DeviceError, NetTraceError, ReadOnlyViolation
 from nettrace.inventory import Device, PanoramaConfig
 from nettrace.models import Evidence, Flow, Hop, Outcome, Status
 from nettrace.netutil import protocol_number, uses_ports
 from nettrace.readonly import check_panos_request
-from nettrace.steps import DeviceAt, Egress, StepResult
+from nettrace.steps import DeviceAt, Egress, StepResult, ipv6_unknown
 
 log = logging.getLogger("nettrace")
 
@@ -603,6 +604,9 @@ def _router_for(client: PanosClient, ingress: str | None) -> str:
 
 def step(client: PanosClient, at: DeviceAt, flow: Flow) -> StepResult:
     dev = client.device
+    v6 = ipv6_unknown(flow, "panos", dev.name, "firewall")  # interface/route/zone lookups here are IPv4-only
+    if v6:
+        return v6
     start = len(client.evidence)
     details: list[str] = list(client.notes)
 
@@ -637,8 +641,11 @@ def step(client: PanosClient, at: DeviceAt, flow: Flow) -> StepResult:
 
     fib = client.fib_lookup(router, flow.dst)
     if fib is None:
+        diag = explain_missing_route(client, router, flow.dst)  # evidence only: why there is no route
+        details.extend(diag.lines)
+        why = f" ({diag.reason})" if diag.reason else ""
         return StepResult([hop(Status.BLOCK, f"no route to {flow.dst} in {router}", ingress=ingress)], flow,
-                          outcome=Outcome.BLOCKED, reason=f"{dev.name}: no route to {flow.dst}")
+                          outcome=Outcome.BLOCKED, reason=f"{dev.name}: no route to {flow.dst}{why}")
     from_zone = ifs.get(ingress or "", {}).get("zone") or None
     to_zone = ifs.get(fib.interface or "", {}).get("zone") or None
     if not from_zone or not to_zone:
@@ -653,9 +660,12 @@ def step(client: PanosClient, at: DeviceAt, flow: Flow) -> StepResult:
     if nat and nat.new_dst and nat.new_dst != flow.dst:
         post = client.fib_lookup(router, nat.new_dst)
         if post is None:
+            diag = explain_missing_route(client, router, nat.new_dst)
+            details.extend(diag.lines)
+            why = f" ({diag.reason})" if diag.reason else ""
             return StepResult([hop(Status.BLOCK, f"no route to post-NAT destination {nat.new_dst}", ingress=ingress,
                                    nat=nat.describe())], flow, outcome=Outcome.BLOCKED,
-                              reason=f"{dev.name}: no route to {nat.new_dst}")
+                              reason=f"{dev.name}: no route to {nat.new_dst}{why}")
         egress_fib = post
         to_zone = ifs.get(post.interface or "", {}).get("zone") or to_zone
 

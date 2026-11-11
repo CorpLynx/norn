@@ -3,6 +3,78 @@
 Short records of choices made while building nettrace. Each one says why it was made, so a later
 change can be judged against the original reason. Newest first.
 
+## D17. A hop with no route explains itself: BGP and static-route evidence; it never turns a BLOCK into a PASS (2026-11-11)
+- **Why:** "no route to X" was true but useless. The next question is always whether BGP never learned it, a
+  neighbor is down, or a static route exists but is not installed.
+- **Only on the failure path.** The evidence commands run after the router/firewall already said there is no route.
+  At most 3 extra Cisco commands (BGP host lookup, BGP summary, static table). PAN-OS: one config `show` of the static-route
+  table and one BGP peer `show`. Nothing extra is sent when a route exists.
+- **Evidence never changes the verdict, with one exception.** BLOCK stays BLOCK. If BGP shows a best path, or the static table
+  marks a matching route active, while the forwarding lookup found none, the sources disagree and nettrace cannot tell which
+  is right: the hop is UNKNOWN and the trace INCOMPLETE (rule 3). A policy-routing hop was already UNKNOWN.
+- **Unreadable output is "not interpreted", never "no routes".** A command the device rejects (BGP not running, command
+  missing on the image) is a detail line. A deadline or cancel is not swallowed.
+- **Allowlist (Cisco):** `show ip bgp <ipv4>`, `show ip bgp summary`, `show ip bgp vpnv4 vrf <name> <ipv4>`,
+  `show ip bgp vpnv4 vrf <name> summary`, `show ip static route [vrf <name>]`. Not allowed: the bare `show ip bgp` (whole table),
+  `show ip bgp neighbors`, received/advertised routes. VRF traces use the vpnv4 forms.
+- **Floating statics:** when the route in use is a static with distance other than 1 the label reads `static (distance N)`
+  and a detail line says it is a backup route in use.
+- **Unverified formats (V17 to V19 in `docs/gaps-and-roadmap.md`).** The static-table reply, the vpnv4 forms and the PAN-OS BGP
+  peer reply were written from documentation and memory. The demo simulator answers in the same assumed format, so a green
+  test run proves the parsers match the assumptions, not the devices.
+- **Demo lab:** the simulator answers the new commands, but the lab routers all have default routes, so no preset reaches the
+  no-route branch. Tests drive it with scripted replies that pass through the real read-only guards.
+
+## D16. Return-path trace is opt-in; a blocked return exits 3; NACLs are not "stateful" (2026-11-11)
+- **Why:** "why can't A reach B" is often the way back: asymmetric routing through a stateful firewall, or a stateless
+  filter that drops the reply (G15).
+- **Default off.** It doubles the read-only queries to devices, Panorama and AWS, so it is a flag (`--return`), a checkbox
+  and a JSON field, never implicit. The forward JSON and exit codes are unchanged without it.
+- **Only after a REACHABLE forward trace.** Otherwise there is no path to compare (NOT_RUN). EXITED is excluded because the
+  destination is outside the known networks and the reverse trace would have to start from an address nettrace cannot place.
+- **Exit codes:** forward BLOCKED stays 3. Forward REACHABLE + return BLOCKED by a stateless hop is 3 ("return path
+  blocked"): the request arrives and the reply is dropped, which is a failed connection. Return INCOMPLETE, or an UNKNOWN
+  symmetry, is 4. ASYMMETRIC is 0 with a warning: the traffic is delivered, but a stateful firewall that sees one direction
+  drops it in real life, so the warning names the device.
+- **A stateful deny on the return flow is not a block.** PAN-OS, Prisma Access and security groups let the reply of an
+  established session through whatever their rules say. nettrace matches policy for a new session and does not read session
+  tables, so a deny there is reported as INCOMPLETE (symmetry UNKNOWN, exit 4) with the reason spelled out. Only stateless
+  hops (NACLs, route lookups, Cisco ACLs) produce a return BLOCKED.
+- **NACLs and Cisco ACLs are stateless, so they are not part of the comparison.** A packet is judged on its own at each
+  one; which NACL it meets does not depend on what the other direction did. Security groups are stateful but attached to the
+  ENI, so both directions meet the same ones.
+- **The comparison uses structured fields only** (device, interface, zone, HA serial, component), never summary text, and
+  any UNKNOWN makes the symmetry UNKNOWN.
+- **Not done:** session-table check, NAT of the return flow beyond what drivers report, ECMP all-paths (G15).
+- **Demo lab:** three presets. The lab firewalls got explicit rules for the reply direction because the return flow is
+  matched as a new session; a TGW static route sends replies to 10.1.20.0/24 around the inspection VPC (asymmetric); a NACL
+  outbound deny to the branch prefix drops the reply (blocked).
+
+## D15. Unmodelled Cisco features are UNKNOWN, not PASS (2026-11-10)
+- **Why:** a router hop that printed PASS while NAT, a zone firewall or IPv6 was in play claimed more than nettrace
+  checked (G11, G20). Never-guess (AGENTS.md rule 3) says to report what is not evaluated.
+- **NAT, zone-based firewall, `ip inspect` on the ingress or egress interface: UNKNOWN, not WARN.** WARN means
+  "forwards, but look at this"; here the verdict itself can be wrong. NAT rewrites the addresses the ACLs and
+  routes were evaluated against, and a zone policy or inspection rule can drop a flow nettrace passed. UNKNOWN also
+  makes the engine downgrade REACHABLE/EXITED to INCOMPLETE, which is the honest result. A feature on an interface
+  that is neither ingress nor egress cannot touch the flow and is ignored. A hard ACL deny still ends BLOCKED (the
+  deny is a fact about the packet as nettrace saw it; with NAT it may have been evaluated against pre-NAT addresses,
+  see "left open" below).
+- **Detection uses three new read-only commands**, added to the exact allowlist (`readonly.py`) with tests and
+  answered by `sim_cisco.py`: `show ip nat statistics` (interface roles only; never `show ip nat translations`, which
+  exposes live host addresses), `show zone security`, `show ip inspect interfaces`. No arguments. `show ip interface`
+  does not name inside/outside reliably, so it is not used for NAT.
+- **A failed probe is not "feature absent".** `% Invalid input`/`Incomplete command` (image without the feature)
+  counts as absent; any other error or unparseable output raises `DeviceError`, so the hop is UNKNOWN. Empty output
+  from `show zone security`/`show ip inspect interfaces` means none configured; empty `show ip nat statistics` too.
+- **IPv6: UNKNOWN at every entry point** (`steps.ipv6_unknown`: Cisco, PAN-OS, AWS, Prisma), before any command is
+  sent. The drivers match IPv4 only (`/32` hosts, wildcard masks, `CidrBlock` without `Ipv6Ranges`), so running them
+  on IPv6 would mean guessing. The ACL evaluator raises for IPv6 as a second line of defence.
+- **Demo lab:** `GigabitEthernet4` (guest VLAN 40, `ip nat inside`) and presets `guest-nat` and `ipv6-not-evaluated`
+  (both expect INCOMPLETE); the original 12 presets are unchanged because only the guest VLAN uses the feature.
+- **Left open:** NAT on the outside interface can also change which ACL entry matches an inbound deny; ECMP, PBR,
+  uRPF and tunnel protection are unchanged (see the report in G11).
+
 ## D14. Web UI login: one-time code, then an HttpOnly session cookie (2026-11-09)
 - **Why:** pasting a token (or opening a `#token=` URL by hand) made `serve` awkward, so `--open` was off by default.
   Now `serve` opens the browser by default at `http://127.0.0.1:PORT/?c=<code>`; `--no-open` only prints it.

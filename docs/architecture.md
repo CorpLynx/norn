@@ -59,6 +59,31 @@ Topology knowledge stays in the inventory and the engine.
   closed normally. The engine ends the trace INCOMPLETE ("cancelled by user", `TraceResult.cancelled`) and keeps the
   hops so far, without adding an UNKNOWN hop. `KeyboardInterrupt` in the engine loop is handled the same way, so
   CLI Ctrl-C exits 4 with partial hops. The web server owns the run-id -> token map (`App.runs`).
+- Return path (`Tracer.trace_with_return`, `symmetry.py`, since v0.4.x): optional second trace destination -> source on
+  the same `Tracer` (one `Deadline` and cancel token: the return trace gets what is left of the budget; the same
+  read-only clients; `check_return` is off for it because the return trace *is* that check). It runs only when the
+  forward Outcome is REACHABLE. BLOCKED/INCOMPLETE: no established forward path to compare. EXITED: the destination is
+  outside the networks nettrace knows, so the reverse trace would start from an address it cannot locate. These give
+  `Symmetry.status = NOT_RUN`. The return flow is built by `symmetry.return_flow`: source = the address the destination
+  really has (after destination NAT), destination = the original source, forward dst_port becomes src_port, return
+  dst_port = the forward src_port or the assumed ephemeral port 49152 (the same assumption as the AWS NACL return
+  check; the notes say so), no user, same application, icmp/other protocols carry no ports.
+  `Return` JSON section (additive; absent without `--return`, forward keys unchanged byte for byte):
+
+  ```
+  "Return": {"Flow": {...}, "Outcome": "REACHABLE|BLOCKED|INCOMPLETE|EXITED|null", "Reason": "...",
+             "Hops": [...], "Warnings": [...], ("Cancelled": true),
+             "Symmetry": {"status": "SYMMETRIC|ASYMMETRIC|UNKNOWN|NOT_RUN", "details": ["..."]}}
+  ```
+
+  `Outcome` is null when not run. Return hop `index` values continue after the forward hops, so a hop number is unique
+  in the result. Comparison (`symmetry.compare`) uses `domain`, `node`, `component`, `ingress`, `egress` and `location`
+  (`zone_from`, `zone_to`, `serial`) only. Compared elements: Cisco/PAN-OS/Prisma devices (`node`) and AWS transit
+  elements (TGW route tables, NAT/internet gateways, VGW, peering, GWLB/VPC endpoints). A device seen in one
+  direction only, or a different set of interfaces, zones or HA members, is ASYMMETRIC (stateful devices are named
+  as such). Not compared: NACLs (stateless), security groups (stateful but they follow the ENI, so both directions use
+  the same ones), subnet route tables. Any UNKNOWN hop or INCOMPLETE return, or interface data in one direction
+  only, makes the status UNKNOWN. Exit code: `output.exit_code`.
 - `Evidence`: (source, request, response). Every request a driver sends is recorded and shown with
   `--verbose`. Keep this up for new drivers; it's how a user audits a verdict.
 - `TraceResult.to_dict()` is the JSON contract used by `--output json` and `--query`, and it is
@@ -261,6 +286,12 @@ The topology comes from one of two places:
 - **Real inventory:** `auto_topology(inv)` builds a Prisma column, one box per site (gateway LANs and
   devices) and one per AWS account (VM-Series included), wraps them into rows, and adds an Internet
   node.
+
+### Return path in the web UI
+`POST /api/trace` accepts `"return": true` (strict bool; anything else is a 400). The entry gets `return_overlay` (the same
+hop -> node mapping for the return hops) and `exit_code`. The UI draws the return hops as a second packet stream beside
+the forward one, in the opposite direction (dotted teal, labelled "return"), adds a divider row in the event list, shows the
+symmetry in the verdict banner and the comparison details in the inspector. All new strings go through `esc()`.
 
 ## Path map (`viz/`)
 

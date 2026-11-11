@@ -17,7 +17,7 @@ from nettrace.errors import NetTraceError
 from nettrace.inventory import Inventory, load_inventory
 from nettrace.models import Flow
 from nettrace.netutil import PROTOCOL_NUMBERS
-from nettrace.output import EXIT_CODES, clean, emit
+from nettrace.output import clean, emit, exit_code
 
 
 class Ctx:
@@ -156,6 +156,10 @@ def trace() -> None:
               help="Overall time budget in seconds (default: inventory trace_timeout, else 120). "
                    "On expiry the trace ends INCOMPLETE with the hops so far. Ctrl-C does the same (exit 4).")
 @click.option("--no-return-check", is_flag=True, help="Skip NACL return-path checks in AWS.")
+@click.option("--return", "with_return", is_flag=True,
+              help="Also trace the return path (destination back to source) and compare it with the forward path "
+                   "(symmetric / asymmetric). Off by default: it doubles the read-only queries to devices and AWS. "
+                   "Forward blocked or incomplete skips it; a blocked return path exits 3, an unverified one 4.")
 @click.option("--verbose", "-v", is_flag=True, help="Show hop details and the raw requests/answers.")
 @click.option("--map", "map_file", type=click.Path(dir_okay=False, writable=True),
               help="Also write a path map: .html (interactive) or .svg (static).")
@@ -164,7 +168,7 @@ def trace() -> None:
 @pass_ctx
 def trace_run(ctx: Ctx, source: str, destination: str, port: int | None, protocol: str, source_port: int | None,
               application: str | None, user: str | None, start_at: str | None, max_hops: int,
-              timeout: float | None, no_return_check: bool, verbose: bool, map_file: str | None, open_map: bool,
+              timeout: float | None, no_return_check: bool, with_return: bool, verbose: bool, map_file: str | None, open_map: bool,
               with_evidence: bool) -> None:
     """Trace SOURCE -> DESTINATION across every device and cloud component on the path."""
     from nettrace.engine import Tracer
@@ -174,16 +178,18 @@ def trace_run(ctx: Ctx, source: str, destination: str, port: int | None, protoco
     with ctx.status(f"tracing {flow.describe()}") as status:
         tracer = Tracer(inv, max_hops=max_hops, check_return=not no_return_check, timeout=timeout,
                         progress=lambda m: status.update(f"tracing {flow.describe()}: {m}"))
-        result = tracer.trace(flow, start_at=start_at)
-    if result.cancelled:  # Ctrl-C: the engine stopped at the next safe point and kept the hops found so far
+        result = tracer.trace_with_return(flow, start_at=start_at) if with_return else tracer.trace(flow, start_at=start_at)
+    if result.cancelled or (result.return_path is not None and result.return_path.cancelled):  # Ctrl-C: the engine stopped at the next safe point and kept the hops found so far
         ctx.err.print("[yellow]cancelled (Ctrl-C):[/] showing the hops found so far; the result is INCOMPLETE")
     ctx.emit(result, verbose=verbose)
     if map_file or open_map:
         path = write_map([result.to_dict()], map_file, with_evidence=with_evidence)
         ctx.err.print(f"path map written to {path}")
+        if result.return_path is not None:
+            ctx.err.print("[dim]the path map shows the forward path only; the return path is in the table / JSON output[/]")
         if open_map:
             open_in_browser(path)
-    sys.exit(EXIT_CODES[result.outcome])
+    sys.exit(exit_code(result))
 
 
 # ===== viz ======================================================================================

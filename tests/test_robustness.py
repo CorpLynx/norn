@@ -115,12 +115,14 @@ def test_prisma_application_group_is_uncertain_not_a_miss():
 
 
 # ---- Cisco ECMP / PBR ----------------------------------------------------------------------------
-def _cisco(entries, pbr=None):
+def _cisco(entries, pbr=None, nat=None, zones=None, inspect=None):
     dev = SimpleNamespace(name="r1", vrf=None)
     return SimpleNamespace(
         device=dev, evidence=[], interface=lambda n: {}, policy_route_map=lambda n: pbr,
+        nat_interfaces=lambda: nat or {}, zone_members=lambda: zones or {}, inspect_rules=lambda: inspect or {},
         cef=lambda ip, vrf: CefResult(prefix="10.20.0.0/16", entries=entries),
-        route=lambda ip, vrf: ("10.20.0.0/16", "bgp 65001"))
+        route=lambda ip, vrf: ("10.20.0.0/16", "bgp 65001"),
+        show=lambda command: "")  # route evidence commands (BGP, static) answer with nothing
 
 
 NH = [CefEntry("nexthop", "10.0.0.2", "Gi1"), CefEntry("nexthop", "10.0.1.2", "Gi2")]

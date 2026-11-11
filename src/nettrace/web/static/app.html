@@ -2,34 +2,41 @@
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>nettrace</title>
+<title>Norn</title>
 <style>
-/* ===== 1. theme: colour tokens (light default, dark via prefers-color-scheme) =====
-   Status colours come in two forms: --b-* (pill/banner background, paired with white text, or dark text for warn)
-   and --t-* (status-coloured text on the panel background). Every pairing is >= 4.5:1.
+/* Design rules for this page live in docs/design-guide.md. Read it before adding a colour, a font size or an animation.
+   ===== 1. tokens (light default, dark via prefers-color-scheme) =====
+   Blue (--accent) is the interface's own voice: things you can act on, what is selected, and neutral information.
+   Green/red/amber/violet are verdicts (pass/block/warn/unknown) and teal is the return path; nothing else uses them.
+   The chrome is neutral "cabinet grey". Status colours come in two forms: --b-* (filled tag or banner,
+   paired with white text, or dark text for warn) and --t-* (status-coloured text on a panel). Every pairing is >= 4.5:1.
    The topology canvas (#ws) deliberately stays a light "paper" surface in both schemes. */
-:root{color-scheme:light dark;--nav:#151c27;--nav2:#1e2836;--navtext:#e3eaf3;--navmuted:#a9b8cc;--line:#cfd8e3;--text:#1b2430;--muted:#566478;
---accent:#1d5fbf;--accent-bg:#1d5fbf;--focus:#1d5fbf;--panel:#fff;--bg:#f6f8fb;--ws:#eef3f8;--soft:#f3f7fc;--sel:#e1edfc;--code:#f6f8fa;
---b-pass:#157a43;--b-block:#c62828;--b-warn:#f5b700;--b-unk:#6d3fc0;--b-info:#1f62a8;--fg-warn:#1a1300;
---t-pass:#157a43;--t-block:#c62828;--t-warn:#8a5a00;--t-unk:#6d3fc0;--t-info:#1f62a8;--chip:#eef3f9;--chipline:#d5e0ec;--note:#f4f7fb}
-@media (prefers-color-scheme:dark){:root{--line:#2c3a4e;--text:#e6ecf4;--muted:#a3b2c6;--accent:#8ec5ff;--focus:#8ec5ff;--panel:#161d29;--bg:#0e131b;
---soft:#1d2736;--sel:#1f3552;--code:#0f1720;--t-pass:#4ade80;--t-block:#ff8f87;--t-warn:#fbbf24;--t-unk:#c4a8ff;--t-info:#7cc0ff;
---chip:#212c3d;--chipline:#33445c;--note:#1b2433}}
-#ws,#pmview{--text:#1b2430;--muted:#566478;--line:#cfd8e3;--soft:#eef2f7;--panel:#fff;--accent:#1d5fbf;--focus:#1d5fbf;--t-pass:#157a43;--t-block:#c62828;--t-warn:#8a5a00;--t-unk:#6d3fc0;--t-info:#1f62a8;color:#1b2430}
+:root{color-scheme:light dark;
+--ui:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace;
+--bg:#e9ecea;--panel:#fbfcfb;--raised:#fff;--soft:#eff2f0;--sel:#e6ecfd;--line:#d3d9d5;--line2:#b4bdb8;--text:#161a19;--muted:#56605c;
+--ink:#161a19;--on-ink:#fff;--accent:#2f5bd8;--accent-bg:#2f5bd8;--on-accent:#fff;--tint:#e6ecfd;--focus:#2f5bd8;--code:#f3f5f4;--chip:#eff2f0;--chipline:#d3d9d5;--note:#f3f5f4;
+--b-pass:#157a43;--b-block:#c62828;--b-warn:#f5b700;--b-unk:#6d3fc0;--b-info:#2f5bd8;--fg-warn:#1a1300;
+--t-pass:#157a43;--t-block:#c62828;--t-warn:#8a5a00;--t-unk:#6d3fc0;--t-info:#2f5bd8;
+--paper:#eef1ef;--sheet:#fafbfa;--pline:#c6cec9;--term:#0f1513;
+--r1:5px;--r2:8px;--r3:12px;--fast:120ms;--med:220ms;--slow:420ms;--ease:cubic-bezier(.2,.8,.2,1);
+--lift:0 1px 2px rgba(22,26,25,.08),0 6px 20px rgba(22,26,25,.10)}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1211;--panel:#171b1a;--raised:#1f2423;--soft:#1f2423;--sel:#1f2a4a;--line:#2a312f;--line2:#414b48;
+--text:#e8ecea;--muted:#9da8a4;--ink:#e8ecea;--on-ink:#121514;--accent:#9db7ff;--accent-bg:#3d63e0;--tint:#1f2a4a;--focus:#9db7ff;--code:#111514;--chip:#222826;--chipline:#36403d;--note:#1c2120;
+--t-pass:#4ade80;--t-block:#ff8f87;--t-warn:#fbbf24;--t-unk:#c4a8ff;--t-info:#9db7ff;--lift:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.45)}}
+#ws,#pmview{--text:#161a19;--muted:#56605c;--line:#d3d9d5;--line2:#b4bdb8;--soft:#eef2f7;--sel:#e6ecfd;--panel:#fff;--raised:#fff;--ink:#161a19;--on-ink:#fff;--accent:#2f5bd8;--accent-bg:#2f5bd8;--tint:#e6ecfd;--focus:#2f5bd8;--t-pass:#157a43;--t-block:#c62828;--t-warn:#8a5a00;--t-unk:#6d3fc0;--t-info:#2f5bd8;--lift:0 1px 2px rgba(22,26,25,.08),0 6px 20px rgba(22,26,25,.10);color:#161a19}
 /* ===== 2. layout ===== */
 *{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden}
-body{font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:var(--text);background:var(--bg);
-display:grid;grid-template-rows:auto auto minmax(0,1fr) 250px;grid-template-columns:260px minmax(0,1fr) 400px;
+body{font:13px/1.4 var(--ui);font-variant-numeric:tabular-nums;color:var(--text);background:var(--bg);
+display:grid;grid-template-rows:auto auto minmax(0,1fr) 264px;grid-template-columns:288px minmax(0,1fr) 400px;
 grid-template-areas:"top top top" "verd verd verd" "left ws insp" "left sim insp"}
-button{font:inherit;cursor:pointer;color:inherit}
+button{font:inherit;cursor:pointer;color:inherit}button:disabled{cursor:not-allowed}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-#top :focus-visible,.prompt:focus-within{outline-color:#8ec5ff}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.skip{position:absolute;left:8px;top:-60px;z-index:20;background:#fff;color:#1b2430;padding:6px 10px;border-radius:6px}.skip:focus{top:8px}
-kbd{font:11px ui-monospace,Menlo,monospace;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--soft)}
+.skip{position:absolute;left:8px;top:-60px;z-index:20;background:var(--ink);color:var(--on-ink);padding:6px 10px;border-radius:var(--r2)}.skip:focus{top:8px}
+kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--raised)}
 h1,h2,h3{margin:0}
 @media (max-width:600px){#simbar{flex-wrap:wrap}}
-@media (max-width:1180px){body{grid-template-columns:220px minmax(0,1fr) 340px}}
+@media (max-width:1180px){body{grid-template-columns:232px minmax(0,1fr) 340px}}
 @media (max-width:900px){
   html,body{overflow:auto;height:auto}body{display:flex;flex-direction:column;min-height:100%;overflow-x:hidden}
   #ws{height:60vh;min-height:320px;flex:none}#sim{height:320px;flex:none}#insp{flex:none;display:block;border-left:0;border-top:1px solid var(--line)}
@@ -37,160 +44,215 @@ h1,h2,h3{margin:0}
   #ipane .devscroll{max-height:none;overflow:visible}#ipane .term{height:300px;flex:none}
   #form{flex-basis:100%}#left{order:9;border-right:0;border-top:1px solid var(--line);overflow:visible}
   #canvas{touch-action:pan-y}}
-/* ===== 3. top bar + trace form ===== */
-#top{grid-area:top;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:8px 12px;background:var(--nav);color:var(--navtext)}
-#brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;letter-spacing:.02em;margin-right:6px}
-#brand svg{width:26px;height:26px}
-.mode{padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.04em}
-.mode.demo{background:#f0a32a;color:#2a1a00}.mode.live{background:#157a43;color:#fff}
-#form{display:flex;flex-wrap:wrap;align-items:flex-start;gap:6px;flex:1;min-width:0;margin:0}
-#form label{font-size:10px;color:var(--navmuted);text-transform:uppercase;letter-spacing:.06em;display:flex;flex-direction:column;gap:2px;min-width:0}
-#form input,#form select{background:var(--nav2);border:1px solid #4a5c75;color:#fff;border-radius:5px;padding:5px 7px;font:12px ui-monospace,Menlo,monospace;width:122px;max-width:100%}
-#form input::placeholder{color:#98a8bd}#form input.sm{width:68px}#form select{width:auto}
-#form input[aria-invalid=true]{border-color:#ff8a80;box-shadow:0 0 0 1px #ff8a80}#form :disabled{opacity:.6;cursor:not-allowed}
-#run{background:var(--accent-bg);color:#fff;border:0;border-radius:6px;padding:8px 16px;font-weight:700;margin-top:14px}
-#run:disabled{opacity:.7;cursor:wait}
-.cancelbtn{background:#fff;color:#7a1f16;border:1px solid #c0392b;border-radius:6px;padding:8px 14px;font-weight:700}
-#cancel{margin-top:14px}#cancel[hidden]{display:none}.cancelbtn:disabled{opacity:.7;cursor:wait}
-#busy .bx{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:520px}#busy .brow{display:flex;align-items:center}#busy .bnote{font-weight:400;font-size:12px;color:#3a4658}
-#ferrs{flex-basis:100%;margin:0;padding:0;list-style:none;color:#ffb4ab;font-size:12px}#ferrs li{margin-top:2px}
-#top .sp{flex:1}#ver{color:var(--navmuted);font-size:11px}
-/* ===== 4. verdict banner ===== */
-#verdict{grid-area:verd;display:none;align-items:center;gap:6px 14px;flex-wrap:wrap;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line);border-left:8px solid var(--muted)}
-#verdict.on{display:flex}
-#verdict .vt{display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:6px;font-weight:800;font-size:15px;color:#fff}
-#verdict .vt .vi{font-size:17px}#verdict .vm{display:flex;flex-wrap:wrap;gap:2px 16px;min-width:0;flex:1;line-height:1.4}
-#verdict .vm span{overflow-wrap:anywhere}#verdict .vm b{color:var(--muted);font-weight:600;margin-right:4px}
-#verdict .lnk{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;font-weight:600}
-.V-REACHABLE{border-left-color:var(--b-pass)!important}.V-REACHABLE .vt{background:var(--b-pass)}
-.V-BLOCKED{border-left-color:var(--b-block)!important}.V-BLOCKED .vt{background:var(--b-block)}
-.V-EXITED{border-left-color:var(--b-info)!important}.V-EXITED .vt{background:var(--b-info)}
-.V-INCOMPLETE{border-left-color:var(--b-warn)!important}.V-INCOMPLETE .vt{background:var(--b-warn);color:var(--fg-warn)}
-/* ===== 5. left panel: scenarios, history, legend ===== */
+/* ===== 3. top bar + trace form (the flow reads as one line: source -> destination, protocol, port) ===== */
+#top{grid-area:top;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
+#brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;letter-spacing:-.01em}
+#brand svg{width:24px;height:24px}#brand svg path{stroke:var(--text)}#brand svg .n0{fill:var(--accent)}#brand svg .n1{fill:var(--t-pass)}#brand svg .n2{fill:var(--t-block)}
+.mode{padding:2px 10px;border-radius:99px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.mode.demo{border:1px dashed var(--accent);color:var(--accent);background:var(--tint)}.mode.live{background:var(--accent-bg);color:var(--on-accent)}
+#form{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1;min-width:0;margin:0}
+.flowbar{display:flex;align-items:stretch;min-width:0;background:var(--raised);border:1px solid var(--line2);border-radius:var(--r2)}
+.flowbar.opt{border-color:var(--line);background:none}
+.flowbar .to{display:flex;align-items:center;color:var(--muted);font-size:15px}.flowbar .to+label{border-left:0}
+#form label{display:flex;flex-direction:column;min-width:0;padding:4px 10px 5px;border-left:1px solid var(--line);font-size:10.5px;line-height:1.3;color:var(--muted);cursor:text;transition:background var(--fast)}
+.flowbar>label:first-child{border-left:0;border-radius:7px 0 0 7px}.flowbar>label:last-child{border-radius:0 7px 7px 0}
+.flowbar label:hover{background:var(--soft)}.flowbar label:focus-within{background:var(--raised);box-shadow:inset 0 0 0 2px var(--focus);color:var(--text)}
+#form input,#form select{background:transparent;border:0;border-radius:0;padding:0;margin:0;color:var(--text);font:13px/1.35 var(--mono);width:116px;max-width:100%;outline-color:transparent}
+#form input::placeholder{color:var(--muted);opacity:.7}#form input.sm{width:58px}#form select{width:auto;cursor:pointer}
+#form label.chk{flex-direction:row;align-items:center;gap:6px;padding:0 2px;border:0;color:var(--text);font-size:12px;white-space:nowrap;cursor:pointer}
+#form label.chk input{width:auto;accent-color:var(--accent-bg);outline-color:var(--focus)}
+#form input[aria-invalid=true]{color:var(--t-block);text-decoration:underline wavy var(--t-block)}
+.flowbar label:has(input[aria-invalid=true]){box-shadow:inset 0 0 0 2px var(--t-block);color:var(--t-block)}
+#form :disabled{opacity:.55;cursor:not-allowed}
+#run{height:38px;padding:0 20px;background:var(--accent-bg);color:var(--on-accent);border:0;border-radius:var(--r2);font-weight:650;transition:transform var(--fast),opacity var(--fast)}
+#run:hover{opacity:.88}#run:active{transform:scale(.97)}#run:disabled{opacity:.6;cursor:wait}
+.cancelbtn{height:38px;padding:0 14px;background:var(--raised);color:var(--t-block);border:1px solid currentColor;border-radius:var(--r2);font-weight:650}
+#cancel[hidden]{display:none}.cancelbtn:disabled{opacity:.6;cursor:wait}
+#ferrs{flex-basis:100%;margin:0;padding:0;list-style:none;color:var(--t-block);font-size:12px}#ferrs li{margin-top:2px}
+#top .sp{display:none}#ver{color:var(--muted);font-size:11.5px;margin-left:auto}
+/* ===== 4. verdict band: outcome flag, facts, one tick per hop ===== */
+#verdict{grid-area:verd;display:none;align-items:stretch;min-width:0;overflow:hidden;background:var(--panel);border-bottom:1px solid var(--line);--vc:var(--muted);--vf:#fff}
+#verdict.on{display:flex;flex-wrap:wrap;background:color-mix(in srgb,var(--vc) 9%,var(--panel))}
+#verdict .vt{display:flex;align-items:center;gap:9px;padding:9px 30px 9px 14px;background:var(--vc);color:var(--vf);font-weight:700;font-size:15px;letter-spacing:-.005em;
+  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,0 100%);animation:flagin var(--slow) var(--ease) both}
+#verdict .vt .vi{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--vf);color:var(--vc);font-size:13px;font-weight:800;flex:none}
+#verdict .vm{display:flex;flex-wrap:wrap;align-items:center;gap:2px 22px;min-width:280px;flex:1 1 0;padding:7px 14px;line-height:1.45;animation:fadein var(--slow) ease-out both}
+#verdict .vm span{overflow-wrap:anywhere}#verdict .vm b{color:var(--muted);font-weight:500;margin-right:6px}
+#verdict .lnk{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;text-underline-offset:2px;font-weight:600}
+#verdict.V-REACHABLE{--vc:var(--b-pass)}#verdict.V-BLOCKED{--vc:var(--b-block)}#verdict.V-EXITED{--vc:var(--b-info)}#verdict.V-INCOMPLETE{--vc:var(--b-warn);--vf:var(--fg-warn)}
+#vstrip{display:flex;flex-wrap:wrap;align-items:center;align-content:center;gap:3px;padding:7px 14px;flex:0 1 auto;max-width:min(100%,470px)}
+.tk{display:grid;place-items:center;flex:none;width:18px;height:22px;padding:0;border:0;border-radius:4px;color:#fff;font:700 11px var(--ui);
+  animation:tickin var(--med) var(--ease) both;animation-delay:calc(var(--i,0)*22ms + 120ms);transition:box-shadow var(--fast),transform var(--fast)}
+.tk.PASS{background:var(--b-pass)}.tk.BLOCK{background:var(--b-block)}.tk.WARN{background:var(--b-warn);color:var(--fg-warn)}.tk.UNKNOWN{background:var(--b-unk)}
+.tk.INFO{background:var(--tint);color:var(--t-info)}
+.tk:hover{transform:translateY(-1px)}.tk.cur{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
+.tksep{color:var(--muted);padding:0 3px}
+.sym{font-weight:700}.sym-SYMMETRIC{color:var(--t-pass)}.sym-ASYMMETRIC,.sym-UNKNOWN{color:var(--t-warn)}.sym-NOT_RUN{color:var(--muted)}
+@keyframes flagin{from{transform:translateX(-102%)}}@keyframes fadein{from{opacity:0}}@keyframes tickin{from{opacity:0;transform:translateY(5px)}}
+/* ===== 5. left rail: scenarios, history, legend ===== */
 #left{grid-area:left;background:var(--panel);border-right:1px solid var(--line);overflow:auto;display:flex;flex-direction:column;min-width:0}
-.sec{padding:10px 12px;border-bottom:1px solid var(--line)}
-.sec h2{margin:0 0 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.sec{padding:12px 14px;border-bottom:1px solid var(--line)}
+.sec h2{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--muted)}
+#top{box-shadow:inset 0 2px 0 var(--accent-bg)}
 .lab{font-size:12px;color:var(--muted);line-height:1.45}.lab b{color:var(--text)}
-#labsec h2{margin:0}#labtoggle{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;padding:2px 0;text-align:left;font:inherit;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-#labtoggle:hover{color:var(--text)}#labtoggle .ch{font-size:10px;width:1em;flex:none}#labinfo{margin-top:8px}#labinfo[hidden]{display:none}
-.preset{position:relative;display:block;width:100%;text-align:left;border:1px solid var(--line);border-left:5px solid var(--b-info);border-radius:6px;padding:7px 9px;margin-bottom:7px;background:var(--panel)}
-.preset:hover{background:var(--soft)}.preset.on{background:var(--sel);border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
-.preset.on::after{content:"SELECTED";position:absolute;right:8px;top:7px;font-size:9.5px;font-weight:800;letter-spacing:.08em;color:var(--accent)}
-.preset.on .t{padding-right:64px}.preset:disabled{opacity:.6;cursor:not-allowed}
-.preset .t{font-weight:600}.preset .s{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.35;overflow-wrap:anywhere}
-.preset .x{display:inline-block;font-size:11px;font-weight:700;margin-top:5px;padding:1px 8px;border:1px solid currentColor;border-radius:9px}
-.preset.REACHABLE{border-left-color:var(--b-pass)}.preset.BLOCKED{border-left-color:var(--b-block)}.preset.EXITED{border-left-color:var(--b-info)}.preset.INCOMPLETE{border-left-color:var(--b-warn)}
-.preset.REACHABLE .x{color:var(--t-pass)}.preset.BLOCKED .x{color:var(--t-block)}.preset.EXITED .x{color:var(--t-info)}.preset.INCOMPLETE .x{color:var(--t-warn)}
-.hist{display:flex;gap:6px;align-items:center;width:100%;text-align:left;background:none;border:0;padding:5px 4px;border-radius:5px;font:11.5px ui-monospace,Menlo,monospace}
-.hist:hover{background:var(--soft)}.hist .tt{overflow-wrap:anywhere}
+#labsec h2{margin:0}#labtoggle{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;padding:2px 0;text-align:left;font:inherit;font-size:12px;font-weight:600;color:var(--muted)}
+#labtoggle:hover{color:var(--accent)}#labtoggle .ch{font-size:10px;width:1em;flex:none}#labinfo{margin-top:8px}#labinfo[hidden]{display:none}
+#presetsec{padding-left:0;padding-right:0}#presetsec h2{padding:0 14px}
+.preset{position:relative;display:grid;grid-template-columns:18px minmax(0,1fr);column-gap:9px;width:100%;text-align:left;border:0;padding:8px 14px;background:none;transition:background var(--fast)}
+.preset::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:0 3px 3px 0;background:var(--accent);transform:scaleY(0);transition:transform var(--med) var(--ease)}
+.preset:hover{background:var(--soft)}.preset.on{background:var(--sel)}.preset.on::before{transform:scaleY(1)}
+.preset.on::after{content:"Selected";position:absolute;right:12px;top:9px;font-size:10.5px;font-weight:600;color:var(--accent)}
+.preset.on .t{padding-right:56px}.preset:disabled{opacity:.55}
+.preset .g{grid-row:1/4;display:grid;place-items:center;width:18px;height:18px;margin-top:1px;border:1.5px solid currentColor;border-radius:50%;background:color-mix(in srgb,currentColor 13%,transparent);font-size:10px;font-weight:800}
+.preset .t,.preset .s,.preset .x{grid-column:2}
+.preset .t{font-weight:600}.preset .s{font:11px/1.4 var(--mono);color:var(--muted);margin-top:1px;overflow-wrap:anywhere}
+.preset .x{display:inline-block;font-size:11.5px;margin-top:2px}
+.preset.REACHABLE .g,.preset.REACHABLE .x{color:var(--t-pass)}.preset.BLOCKED .g,.preset.BLOCKED .x{color:var(--t-block)}
+.preset.EXITED .g,.preset.EXITED .x{color:var(--t-info)}.preset.INCOMPLETE .g,.preset.INCOMPLETE .x{color:var(--t-warn)}
+.hist{display:flex;gap:7px;align-items:baseline;width:100%;text-align:left;background:none;border:0;padding:5px 6px;margin:0 -6px;border-radius:var(--r1);font-size:12px;transition:background var(--fast)}
+.hist:hover{background:var(--soft)}.hist .tt{overflow-wrap:anywhere;font:11.5px var(--mono)}.hist .lab{flex:none}
 .og{font-weight:800;width:1.2em;text-align:center;flex:none}.og.REACHABLE{color:var(--t-pass)}.og.BLOCKED{color:var(--t-block)}.og.EXITED{color:var(--t-info)}.og.INCOMPLETE{color:var(--t-warn)}
-.legend span{display:inline-flex;align-items:center;gap:5px;margin:0 10px 4px 0;font-size:11.5px}
-.legend .g{font-weight:800;width:1.2em;text-align:center}
+.legend span{display:inline-flex;align-items:center;gap:5px;margin:0 12px 4px 0;font-size:12px}
+.legend .g{font-weight:800;font-style:normal;width:1.2em;text-align:center}
 .empty{color:var(--muted);padding:14px;line-height:1.45}
 /* ===== 6. workspace: canvas, tools ===== */
-#ws{grid-area:ws;position:relative;overflow:hidden;background:var(--ws);min-width:0}
-#tabs{position:absolute;left:10px;top:10px;z-index:3;display:flex;gap:4px}
-.tab{background:#fff;border:1px solid var(--line);border-radius:6px;padding:5px 11px;font-weight:600;color:#3a4658}
-.tab[aria-pressed=true]{background:var(--nav);color:#fff;border-color:var(--nav)}
-#tools{position:absolute;right:10px;top:10px;z-index:3;display:flex;gap:4px}
-#tools button{background:#fff;border:1px solid var(--line);border-radius:6px;padding:5px 9px;color:#1b2430;min-width:30px}
+#ws{grid-area:ws;position:relative;overflow:hidden;background:var(--paper);min-width:0}
+#tabs,#tools{position:absolute;top:12px;z-index:3;display:flex;padding:3px;gap:2px;background:var(--raised);border:1px solid var(--line);border-radius:10px;box-shadow:var(--lift)}
+#tabs{left:12px}#tools{right:12px}
+.tab,#tools button{background:none;border:0;border-radius:7px;padding:4px 12px;font-weight:600;color:var(--muted);min-width:30px;transition:background var(--fast),color var(--fast)}
+.tab:hover,#tools button:hover{color:var(--accent);background:var(--sel)}
+.tab[aria-pressed=true]{background:var(--accent-bg);color:#fff}
 #canvas{position:absolute;inset:0;cursor:grab}#canvas.drag{cursor:grabbing}
-#stage{position:absolute;left:0;top:0;transform-origin:0 0}
-#hint{position:absolute;left:10px;bottom:8px;z-index:3;font-size:11px;color:#3a4658;background:#ffffffdd;padding:2px 7px;border-radius:4px;max-width:calc(100% - 20px)}
-#pmview{position:absolute;inset:48px 10px 10px;background:#fbfcfd;border:1px solid var(--line);border-radius:8px;display:none}
+#stage{position:absolute;left:0;top:0;transform-origin:0 0}#stage.glide{transition:transform var(--slow) var(--ease)}
+#hint{position:absolute;left:12px;bottom:10px;z-index:3;font-size:11.5px;color:var(--muted);background:#fffffff0;border:1px solid var(--line);padding:3px 9px;border-radius:var(--r2);max-width:calc(100% - 24px)}
+#pmview{position:absolute;inset:54px 12px 12px;background:#fff;border:1px solid var(--line);border-radius:var(--r3);display:none}
 .pmbox{display:flex;overflow:auto;scrollbar-gutter:stable;padding:6px}.pmbox svg{flex:none;margin:auto;display:block}
-#ipane.pmtab{display:flex;flex-direction:column;overflow:hidden}#ipane .pmbox{flex:1 1 0;min-height:120px;background:#fbfcfd;border:1px solid var(--line);border-radius:8px;color:#1b2430}
+#ipane.pmtab{display:flex;flex-direction:column;overflow:hidden}#ipane .pmbox{flex:1 1 0;min-height:120px;background:#fff;border:1px solid var(--line);border-radius:var(--r2);color:#161a19}
 #ipane.pmtab .lab{flex:none;margin:8px 0 0}
-#busy{position:absolute;inset:0;background:#eef3f8e6;display:none;align-items:center;justify-content:center;z-index:4;font-weight:600;color:#2b3646;text-align:center;padding:20px}
-.spin{width:22px;height:22px;border:3px solid #c5d2e1;border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;margin-right:10px;flex:none}
-@keyframes sp{to{transform:rotate(360deg)}}
-/* topology svg */
-.node{cursor:pointer}.node .tile{fill:#fff;stroke:#cfd8e3;stroke-width:1.2}
-.node:hover .tile{stroke:#1d5fbf}.node.sel .tile{stroke:#1d5fbf;stroke-width:3}.node:focus{outline:none}.node:focus-visible .tile{stroke:#1d5fbf;stroke-width:4}
-.node .lbl{font:600 12.5px sans-serif;fill:#1b2430;paint-order:stroke;stroke:#eef3f8;stroke-width:4px;stroke-linejoin:round}
-.node .sub{font:10.5px sans-serif;fill:#4d5b6e;paint-order:stroke;stroke:#eef3f8;stroke-width:4px;stroke-linejoin:round}
-.node.dim{opacity:.38}.link.dim{opacity:.3}
-.link line{stroke:#6f7f94;stroke-width:2.2}.link.tunnel line{stroke:#8a63d2;stroke-dasharray:7 5}
-.link.attachment line{stroke:#a97fe8;stroke-width:3}
-.iflbl{font:10px ui-monospace,Menlo,monospace;fill:#33404f;paint-order:stroke;stroke:#eef3f8;stroke-width:4px}
-.lnklbl rect{fill:#fff;stroke:#c9d2de}.lnklbl text{font:10px sans-serif;fill:#4d3d7c}
-.ring{fill:none;stroke-width:3.5}.st-PASS .ring{stroke:#157a43}.st-BLOCK .ring{stroke:#c62828;stroke-width:5}
-.st-WARN .ring,.st-UNKNOWN .ring{stroke:#d9971c}.st-INFO .ring{stroke:#1f62a8}
-.cur .ring{filter:drop-shadow(0 0 6px #2f7de1)}
-.seg{fill:none;stroke-width:6;stroke-linecap:round;opacity:.9}.seg.PASS{stroke:#157a43}.seg.BLOCK{stroke:#c62828}
-.seg.WARN,.seg.UNKNOWN{stroke:#d9971c}.seg.base{opacity:.3}.seg.rm{stroke-dasharray:9 9}
-.seg.todo{stroke:#8795a8;stroke-dasharray:3 9;stroke-width:4}.seg.virt{stroke-dasharray:10 7}
-@keyframes flow{to{stroke-dashoffset:-32}}.seg.live{stroke-dasharray:14 18;animation:flow .9s linear infinite}
-@media (prefers-reduced-motion:reduce){.seg.live{animation:none}.spin{animation:none}}
-/* ===== 7. simulation panel: controls, scrubber, event list ===== */
+#busy{position:absolute;inset:0;background:#eef1efd9;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:4;font-weight:600;color:var(--text);text-align:center;padding:20px;animation:fadein var(--med) ease-out}
+#busy .bx{display:flex;flex-direction:column;align-items:center;gap:12px;max-width:520px;padding:20px 24px;background:var(--raised);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--lift)}
+#busy .brow{display:flex;flex-direction:column;align-items:center;gap:12px}#busy .bnote{font-weight:400;font-size:12px;color:var(--muted)}
+/* waiting: a probe stepping along five hops (not a spinner; the trace really is walking hop by hop) */
+.spin{position:relative;display:flex;gap:16px;flex:none}.spin::before{content:"";position:absolute;left:4px;right:4px;top:50%;height:2px;margin-top:-1px;background:var(--line2)}
+.spin i{position:relative;width:10px;height:10px;border-radius:50%;background:var(--raised);border:2px solid var(--line2);animation:probe 1.5s ease-in-out infinite}
+.spin i:nth-child(2){animation-delay:.15s}.spin i:nth-child(3){animation-delay:.3s}.spin i:nth-child(4){animation-delay:.45s}.spin i:nth-child(5){animation-delay:.6s}
+@keyframes probe{0%,55%,100%{background:var(--raised);border-color:var(--line2);transform:none}18%{background:var(--accent-bg);border-color:var(--accent-bg);transform:scale(1.35)}}
+/* topology svg (always on light paper: fixed colours, not theme tokens) */
+.node{cursor:pointer;transition:opacity var(--slow)}.node .tile{fill:#fff;stroke:var(--pline);stroke-width:1.2;transition:stroke var(--fast),stroke-width var(--fast)}
+.node:hover .tile{stroke:#2f5bd8}.node.sel .tile{stroke:#2f5bd8;stroke-width:2.6}.node:focus{outline:none}.node:focus-visible .tile{stroke:#2f5bd8;stroke-width:4}
+.node .lbl{font:600 12.5px var(--ui);fill:#161a19;paint-order:stroke;stroke:var(--sheet);stroke-width:4px;stroke-linejoin:round}
+.node .sub{font:10.5px var(--ui);fill:#56605c;paint-order:stroke;stroke:var(--sheet);stroke-width:4px;stroke-linejoin:round}
+.node.dim{opacity:.42;filter:grayscale(1)}.link{transition:opacity var(--slow)}.link.dim{opacity:.3}
+.link line{stroke:#87928c;stroke-width:1.8}.link.tunnel line{stroke-dasharray:7 5}
+.link.attachment line{stroke:#a3ada8;stroke-width:3.4}
+.iflbl{font:10px var(--mono);fill:#3c4541;paint-order:stroke;stroke:var(--sheet);stroke-width:4px}
+.lnklbl rect{fill:#fff;stroke:var(--pline)}.lnklbl text{font:10px var(--ui);fill:#56605c}
+.ring,.ping{fill:none;transform-box:fill-box;transform-origin:center}
+.ring{stroke:currentColor;stroke-width:3.2;animation:ringin var(--slow) var(--ease)}
+.st-PASS .ring{color:#157a43}.st-BLOCK .ring{color:#c62828;stroke-width:5}.st-WARN .ring{color:#d9971c}.st-UNKNOWN .ring{color:#6d3fc0}.st-INFO .ring{color:#2f5bd8}
+.st-PASS .tile{fill:#eef8f1}.st-BLOCK .tile{fill:#fdeeee}.st-WARN .tile{fill:#fdf6e3}.st-UNKNOWN .tile{fill:#f3eefc}.st-INFO .tile{fill:#edf1fd}
+.cur .ring{filter:drop-shadow(0 0 5px currentColor)}
+.ping{stroke:#2f5bd8;stroke-width:2;opacity:0}.node.cur .ping{animation:ping .7s var(--ease)}
+.node.cur.st-BLOCK .ping{stroke:#c62828;stroke-width:3;animation:ping .55s var(--ease) 2}
+@keyframes ringin{from{opacity:0;transform:scale(1.25)}}@keyframes ping{from{opacity:.55;transform:scale(1)}to{opacity:0;transform:scale(1.55)}}
+.seg{fill:none;stroke-width:5;stroke-linecap:round;opacity:.9}.seg.PASS{stroke:#157a43}.seg.BLOCK{stroke:#c62828}
+.seg.WARN{stroke:#d9971c}.seg.UNKNOWN{stroke:#6d3fc0}.seg.base{opacity:.32}.seg.rm{stroke-dasharray:9 9}
+.seg.todo{stroke:#87928c;stroke-dasharray:3 9;stroke-width:4}.seg.virt{stroke-dasharray:10 7}
+/* a newly reached edge draws itself from the source side, in step with the packet front (--rv = reveal time) */
+.seg.draw{stroke-dasharray:1;stroke-dashoffset:1;animation:draw var(--rv,600ms) linear forwards}.seg.fade{animation:segfade var(--rv,600ms) linear both}
+@keyframes draw{to{stroke-dashoffset:0}}@keyframes segfade{from{opacity:0}}
+/* return stream: its own colour family (teal) and a dotted pattern, drawn beside the forward stream in the opposite direction */
+.seg.ret.PASS{stroke:#0b7285}.seg.ret,.seg.ret.virt{stroke-dasharray:1 10}.seg.ret.rm{stroke-dasharray:1 10}
+.retlbl{font:600 10.5px var(--ui);paint-order:stroke;stroke:var(--sheet);stroke-width:4px;stroke-linejoin:round}
+.retlbl.f{fill:#145c32}.retlbl.r{fill:#0b5f6e}
+.stamp{font:700 10px var(--ui);letter-spacing:.06em}
+.pmnote{position:absolute;left:12px;bottom:8px;max-width:calc(100% - 24px);background:#fffffff0;padding:2px 8px;border-radius:99px;font-size:11.5px;color:#56605c}
+/* ===== 7. playback panel: controls, scrubber, event list ===== */
 #sim{grid-area:sim;background:var(--panel);border-top:1px solid var(--line);display:grid;grid-template-rows:auto minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr);min-height:0;min-width:0}
-#simbar{display:flex;flex-wrap:nowrap;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--soft)}
-#simbar b{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:6px}
-.ctl{background:var(--panel);border:1px solid var(--line);border-radius:5px;width:32px;height:28px;font-size:13px}
-.ctl:hover{border-color:var(--accent)}.ctl:disabled,#scrub:disabled{opacity:.45;cursor:default}
-#play{width:44px;background:var(--nav);color:#fff;border-color:var(--nav)}#replay{width:auto;padding:0 8px}
-#stepinfo{font:12px ui-monospace,Menlo,monospace;color:var(--text);margin-left:4px;min-width:0;flex:0 1 auto;max-width:30ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#simbar{display:flex;flex-wrap:nowrap;align-items:center;gap:2px;padding:6px 12px;border-bottom:1px solid var(--line)}
+#simbar b{font-size:12px;font-weight:600;color:var(--muted);margin-right:8px}
+.ctl{display:grid;place-items:center;background:none;border:0;border-radius:var(--r1);width:30px;height:30px;color:var(--text);transition:background var(--fast),transform var(--fast)}
+.ctl svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.ctl:hover{background:var(--sel)}.ctl:active{transform:scale(.92)}.ctl:disabled,#scrub:disabled{opacity:.4;cursor:default}
+#play{width:34px;height:34px;margin:0 4px;border-radius:50%;background:var(--accent-bg);color:#fff}#play:hover{background:var(--accent-bg);opacity:.88}
+#play svg{fill:currentColor;stroke-width:1.2}#play .i-pause{display:none;fill:none;stroke-width:2.6}#play.on .i-play{display:none}#play.on .i-pause{display:inline}
+#replay{display:flex;gap:6px;width:auto;padding:0 9px;margin-right:8px;font-size:12px}
+#stepinfo{font-size:12px;color:var(--text);margin-left:10px;min-width:0;flex:0 1 auto;max-width:30ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:1360px){#simbar>b,#simbar label[for=speed]{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
-#scrub{flex:1 1 120px;min-width:50px;max-width:340px;accent-color:var(--accent);height:24px}
-#simbar select{font-size:12px;height:28px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:5px}
-#simbar .sp{flex:1 0 0}#simbar b,#simbar .ctl,#simbar label,#simbar select{flex:none}#simbar label{font-size:11px;color:var(--muted)}
-#kbhint{padding:4px 10px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+#scrub{flex:1 1 120px;min-width:50px;max-width:360px;accent-color:var(--accent-bg);height:24px}
+#simbar select{font:12px var(--ui);height:28px;background:var(--raised);color:var(--text);border:1px solid var(--line);border-radius:var(--r1)}
+#simbar .sp{flex:1 0 0}#simbar b,#simbar .ctl,#simbar label,#simbar select{flex:none}#simbar label{font-size:12px;color:var(--muted);margin-right:6px}
+#kbhint{padding:5px 12px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #events{overflow:auto;min-height:0}
 #events table{width:100%;border-collapse:collapse;table-layout:fixed}
-#events th{position:sticky;top:0;background:var(--panel);text-align:left;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:5px 8px;border-bottom:1px solid var(--line);z-index:1}
-#events td{padding:4px 8px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#events tr.ev{cursor:pointer}#events tr.ev:hover{background:var(--soft)}#events tr.cur{background:var(--sel);box-shadow:inset 4px 0 0 var(--accent)}
-#events tr.hl{outline:2px dashed var(--accent);outline-offset:-2px}#events tr.future td:not(:first-child){color:var(--muted)}#events tr.future .pill{opacity:.7}
-#events tr.dt td{white-space:normal;background:var(--soft);padding:6px 12px 8px 40px}
+#events th{position:sticky;top:0;background:var(--panel);text-align:left;font-size:11.5px;font-weight:500;color:var(--muted);padding:5px 8px;border-bottom:1px solid var(--line);z-index:1}
+#events td{padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background var(--med),color var(--med)}
+#events tr.ev{cursor:pointer}#events tr.ev:hover{background:var(--soft)}#events tr.cur{background:var(--sel);box-shadow:inset 3px 0 0 var(--accent)}
+#events tr.hl{outline:2px dashed var(--accent);outline-offset:-2px}#events tr.future td:not(:first-child){color:var(--muted)}#events tr.future .pill{opacity:.55}
+#events tr.rdiv td{background:var(--soft);border-top:1px solid var(--line2);border-bottom:1px solid var(--line2);font-weight:600;white-space:normal;padding:7px 12px}
+#events tr.rdiv .sym{margin-left:10px}
+#events tr.dt td{white-space:normal;background:var(--soft);padding:8px 12px 10px 74px}
 #events tr.dt[hidden]{display:none}#events tr.dt dl{margin:0 0 4px}#events tr.dt ul{margin:2px 0;padding-left:16px}
-.xbtn{background:none;border:0;padding:0 4px;width:24px;color:var(--accent);font-size:12px}
-.pill{display:inline-block;min-width:74px;text-align:center;padding:1px 6px;border-radius:9px;color:#fff;font:700 10.5px sans-serif;white-space:nowrap}
-.pill.PASS{background:var(--b-pass)}.pill.BLOCK{background:var(--b-block)}.pill.WARN{background:var(--b-warn);color:var(--fg-warn)}.pill.UNKNOWN{background:var(--b-unk)}.pill.INFO{background:var(--b-info)}
+.xbtn{background:none;border:0;border-radius:4px;padding:0 4px;width:24px;color:var(--muted);font-size:12px}.xbtn:hover{color:var(--text)}
+/* status tag: solid for a decision (pass/block/warn/unknown), soft blue tint for a lookup (info), so decisions stand out in a long list */
+.pill{display:inline-block;min-width:78px;text-align:center;padding:1px 7px;border-radius:var(--r1);color:#fff;font:700 10.5px/1.55 var(--ui);letter-spacing:.02em;white-space:nowrap;transition:opacity var(--med)}
+.pill.PASS{background:var(--b-pass)}.pill.BLOCK{background:var(--b-block)}.pill.WARN{background:var(--b-warn);color:var(--fg-warn)}.pill.UNKNOWN{background:var(--b-unk)}
+.pill.INFO{background:var(--tint);color:var(--t-info)}
 /* ===== 8. inspector + console ===== */
 #insp{grid-area:insp;background:var(--panel);border-left:1px solid var(--line);display:grid;grid-template-rows:auto auto minmax(0,1fr);min-height:0;min-width:0}
-#summary{padding:8px 14px;border-bottom:1px solid var(--line)}
+#summary{padding:10px 16px;border-bottom:1px solid var(--line)}#summary>b{font:600 13px var(--mono)}
 #summary .r{color:var(--muted);margin-top:4px;line-height:1.35}
 #summary ul{margin:5px 0 0;padding-left:16px;color:var(--t-warn);font-size:12px}
-#itabs{display:flex;border-bottom:1px solid var(--line)}
-#itabs button{flex:1;background:none;border:0;border-bottom:3px solid transparent;font-weight:600;color:var(--muted);padding:8px 4px}
-#itabs button[aria-pressed=true]{color:var(--text);border-bottom-color:var(--accent)}
-#ipane{overflow:auto;padding:12px 14px;min-height:0}
-#ipane h3{margin:0 0 4px;font-size:15px}#ipane .lead{margin:0 0 10px}
-dl.kv{display:grid;grid-template-columns:92px 1fr;gap:4px 10px;margin:0 0 12px}dl.kv dt{color:var(--muted)}dl.kv dd{margin:0;overflow-wrap:anywhere}
+#itabs{display:flex;padding:0 8px;border-bottom:1px solid var(--line)}
+#itabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:600;color:var(--muted);padding:9px 4px;transition:color var(--fast),border-color var(--med)}
+#itabs button:hover{color:var(--text)}#itabs button[aria-pressed=true]{color:var(--accent);border-bottom-color:var(--accent)}
+#ipane{overflow:auto;padding:14px 16px;min-height:0}
+#ipane h3{margin:0 0 4px;font-size:15px;letter-spacing:-.005em}#ipane .lead{margin:0 0 12px}
+dl.kv{display:grid;grid-template-columns:92px 1fr;gap:5px 10px;margin:0 0 14px}dl.kv dt{color:var(--muted)}dl.kv dd{margin:0;overflow-wrap:anywhere}
 ul.det{padding-left:16px;margin:4px 0 12px}
-#ipane a,.lnkbtn{color:var(--accent)}
-details.ev{border:1px solid var(--line);border-radius:6px;margin:6px 0}details.ev summary{padding:5px 8px;cursor:pointer;font:11px ui-monospace,Menlo,monospace;color:var(--accent);overflow-wrap:anywhere}
-pre{margin:0;padding:8px;max-height:300px;overflow:auto;background:var(--code);font:11px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
-.devhead{display:flex;gap:12px;align-items:center;margin-bottom:10px}.devhead svg{width:56px;height:56px;flex:none}
+#ipane a,.lnkbtn{color:var(--accent);text-underline-offset:2px}
+details.ev{border:1px solid var(--line);border-radius:var(--r2);margin:6px 0;overflow:hidden}details.ev summary{padding:6px 9px;cursor:pointer;font:11px var(--mono);color:var(--accent);overflow-wrap:anywhere}
+details.ev summary:hover{background:var(--soft)}details.ev[open] summary{border-bottom:1px solid var(--line)}
+pre{margin:0;padding:9px;max-height:300px;overflow:auto;background:var(--code);font:11px/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.devhead{display:flex;gap:12px;align-items:center;margin-bottom:12px}.devhead svg{width:52px;height:52px;flex:none}
 #ipane.devtab{display:flex;flex-direction:column;overflow:hidden}
 .devscroll{flex:0 1 auto;max-height:45%;min-height:60px;overflow:auto;padding-right:2px}
-.term{background:#0f1720;color:#d5e8cd;border-radius:8px;padding:10px;font:12px/1.45 ui-monospace,Menlo,monospace;flex:1 1 0;min-height:110px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
-.term .cmd{color:#8ad4ff}.term .bad{color:#ff9a90}.term .muted{color:#9aa9bc}.term .warnline{color:#ffd37a}
-.prompt{flex:none;display:flex;align-items:center;background:#0f1720;border-radius:6px;margin-top:6px;padding:4px 8px;color:#8ad4ff;font:12px ui-monospace,Menlo,monospace}
-.prompt input{flex:1;min-width:0;background:none;border:0;color:#fff;font:inherit;outline:none;margin-left:6px}.prompt input::placeholder{color:#8f9db0}
-.chips{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.chip{background:var(--chip);border:1px solid var(--chipline);border-radius:12px;padding:2px 9px;font:11px ui-monospace,Menlo,monospace;color:var(--text)}
-.chip:hover{border-color:var(--accent)}.chip.warn{border-style:dashed}
-.note{background:var(--note);border:1px solid var(--line);border-radius:6px;padding:8px 10px;color:var(--text);font-size:12px;line-height:1.45;margin:8px 0}
-.note ul{margin:4px 0 0;padding-left:16px}.note code{font:11px ui-monospace,Menlo,monospace}
-.row{flex:none;display:flex;gap:8px;align-items:center;margin-top:6px}.row button{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:3px 10px}
-#err{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:#2b1416;color:#ffe0dd;border:1px solid #ff8a80;padding:9px 16px;border-radius:8px;display:none;z-index:10;max-width:min(90%,640px);cursor:pointer;line-height:1.4}
-.fatal{max-width:640px;margin:60px auto;padding:20px;font:15px/1.5 sans-serif;border:2px solid var(--b-block);border-radius:10px;background:var(--panel);color:var(--text)}
-@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+.term{background:var(--term);color:#d3e6cd;border-radius:var(--r2) var(--r2) 0 0;padding:10px 12px;font:12px/1.5 var(--mono);flex:1 1 0;min-height:110px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+.term .cmd{color:#8ad4ff}.term .bad{color:#ff9a90}.term .muted{color:#9aa9a3}.term .warnline{color:#ffd37a}
+.prompt{flex:none;display:flex;align-items:center;background:var(--term);border-top:1px solid #2a332f;border-radius:0 0 var(--r2) var(--r2);padding:6px 12px;color:#8ad4ff;font:12px var(--mono)}
+.prompt:focus-within{box-shadow:0 0 0 2px var(--focus)}
+.prompt input{flex:1;min-width:0;background:none;border:0;color:#fff;font:inherit;outline:none;margin-left:6px}.prompt input::placeholder{color:#8f9d97}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}.chip{background:var(--chip);border:1px solid var(--chipline);border-radius:99px;padding:2px 10px;font:11px var(--mono);color:var(--text);transition:border-color var(--fast),background var(--fast)}
+.chip:hover{border-color:var(--accent);color:var(--accent);background:var(--raised)}.chip.warn{border-style:dashed}
+.note{background:var(--note);border:1px solid var(--line);border-radius:var(--r2);padding:9px 11px;color:var(--text);font-size:12px;line-height:1.45;margin:8px 0}
+.note ul{margin:4px 0 0;padding-left:16px}.note code{font:11px var(--mono)}
+.row{flex:none;display:flex;gap:8px;align-items:center;margin-top:8px}.row button{flex:none;white-space:nowrap;background:var(--raised);border:1px solid var(--line2);border-radius:var(--r1);padding:3px 10px;transition:border-color var(--fast)}.row button:hover{border-color:var(--accent);color:var(--accent)}
+#err{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#2b1416;color:#ffe0dd;border:1px solid #ff8a80;padding:10px 16px;border-radius:var(--r2);box-shadow:var(--lift);display:none;z-index:10;max-width:min(90%,640px);cursor:pointer;line-height:1.4;animation:toastin var(--med) var(--ease)}
+@keyframes toastin{from{opacity:0;transform:translate(-50%,10px)}}
+.fatal{max-width:640px;margin:60px auto;padding:20px;font:15px/1.5 var(--ui);border:2px solid var(--b-block);border-radius:var(--r3);background:var(--panel);color:var(--text)}
+/* ===== 9. reduced motion: no animation or transition anywhere; the path is shown as a static dashed line and stepped by hand ===== */
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 </style></head>
 <body>
 <a class="skip" href="#ws" id="skip">Skip to topology</a>
 <header id="top">
-  <h1 id="brand"><svg viewBox="0 0 26 26" aria-hidden="true"><circle cx="5" cy="13" r="3.2" fill="#5ee08a"/><circle cx="21" cy="6" r="3.2" fill="#7fd1ff"/><circle cx="21" cy="20" r="3.2" fill="#ff8a80"/><path d="M8 13L18 7M8 13l10 6" stroke="#dfe6ef" stroke-width="2" fill="none"/></svg>nettrace</h1>
+  <h1 id="brand"><svg viewBox="0 0 26 26" aria-hidden="true"><path d="M8 13L18 7M8 13l10 6" stroke-width="2" fill="none"/><circle class="n0" cx="5" cy="13" r="3.4"/><circle class="n1" cx="21" cy="6" r="3.4"/><circle class="n2" cx="21" cy="20" r="3.4"/></svg>Norn</h1>
   <span id="mode" class="mode"></span>
   <form id="form" aria-label="Trace a flow" novalidate>
-    <label>Source<input id="f-src" placeholder="10.1.10.25" spellcheck="false" autocomplete="off" aria-describedby="ferrs"></label>
-    <label>Destination<input id="f-dst" placeholder="10.20.1.50" spellcheck="false" autocomplete="off" aria-describedby="ferrs"></label>
-    <label>Protocol<select id="f-proto"><option>tcp</option><option>udp</option><option>icmp</option></select></label>
-    <label>Port<input id="f-port" class="sm" placeholder="443" inputmode="numeric" autocomplete="off" aria-describedby="ferrs"></label>
-    <label>App-ID<input id="f-app" class="sm" placeholder="ssl" spellcheck="false" autocomplete="off" aria-describedby="ferrs"></label>
-    <label>User<input id="f-user" class="sm" placeholder="alice" spellcheck="false" autocomplete="off" aria-describedby="ferrs"></label>
-    <label>Start at<select id="f-start"><option value="">auto</option></select></label>
-    <button id="run" type="submit" title="Trace (Enter)">▶ Trace</button>
+    <div class="flowbar">
+      <label>Source<input id="f-src" placeholder="10.1.10.25" spellcheck="false" autocomplete="off" aria-describedby="ferrs"></label>
+      <span class="to" aria-hidden="true">→</span>
+      <label>Destination<input id="f-dst" placeholder="10.20.1.50" spellcheck="false" autocomplete="off" aria-describedby="ferrs"></label>
+      <label>Protocol<select id="f-proto"><option>tcp</option><option>udp</option><option>icmp</option></select></label>
+      <label>Port<input id="f-port" class="sm" placeholder="443" inputmode="numeric" autocomplete="off" aria-describedby="ferrs"></label>
+    </div>
+    <div class="flowbar opt">
+      <label>App-ID<input id="f-app" class="sm" placeholder="ssl" spellcheck="false" autocomplete="off" aria-describedby="ferrs"></label>
+      <label>User<input id="f-user" class="sm" placeholder="alice" spellcheck="false" autocomplete="off" aria-describedby="ferrs"></label>
+      <label>Start at<select id="f-start"><option value="">auto</option></select></label>
+    </div>
+    <label class="chk" title="Also trace the way back (destination to source) and compare the two paths. Doubles the read-only queries."><input type="checkbox" id="f-return" aria-label="Include return path"> Include return path</label>
+    <button id="run" type="submit" title="Trace (Enter)">Trace</button>
     <button id="cancel" class="cancelbtn" type="button" hidden title="Cancel the running trace (Esc in the busy overlay)">Cancel</button>
     <ul id="ferrs" aria-live="polite"></ul>
   </form>
@@ -207,7 +269,7 @@ pre{margin:0;padding:8px;max-height:300px;overflow:auto;background:var(--code);f
     <span><i class="g" style="color:var(--t-pass)" aria-hidden="true">✓</i>pass</span><span><i class="g" style="color:var(--t-block)" aria-hidden="true">✕</i>block</span>
     <span><i class="g" style="color:var(--t-warn)" aria-hidden="true">!</i>warn</span><span><i class="g" style="color:var(--t-unk)" aria-hidden="true">?</i>unknown (unverified)</span>
     <span><i class="g" style="color:var(--t-info)" aria-hidden="true">i</i>lookup / info</span>
-    <div class="lab" style="margin-top:6px">Dashed purple line = tunnel (IPsec / GlobalProtect / service connection). Thick lilac = TGW attachment. Unknown or warn hops are never shown as success.</div></div>
+    <div class="lab" style="margin-top:6px">Blue marks what you can act on and neutral lookups; green, red, amber and violet are verdicts. Dotted teal line, opposite direction = return path (only with “Include return path”). Dashed grey link = tunnel (IPsec / GlobalProtect / service connection). Heavy grey link = TGW attachment. Unknown or warn hops are never shown as success.</div></div>
 </aside>
 
 <main id="ws" tabindex="-1" aria-label="Topology" aria-busy="false">
@@ -215,24 +277,24 @@ pre{margin:0;padding:8px;max-height:300px;overflow:auto;background:var(--code);f
   <div id="tabs" role="group" aria-label="View"><button class="tab" data-view="topo" aria-pressed="true">Topology</button><button class="tab" data-view="pm" aria-pressed="false">Path map</button></div>
   <div id="tools" role="group" aria-label="Canvas zoom"><button id="zin" aria-label="Zoom in" title="Zoom in (+)">+</button><button id="zout" aria-label="Zoom out" title="Zoom out (-)">−</button><button id="fit" title="Fit whole topology to the view (F)">Fit</button><button id="focus" title="Zoom to the traced path (Z)">Path</button></div>
   <div id="canvas"><div id="stage"><div class="empty">Loading topology…</div></div></div>
-  <div id="hint">Drag to pan · scroll to zoom (Ctrl/⌘+scroll on a stacked layout) · <kbd>F</kbd> fit · Tab to reach devices, Enter to select</div>
+  <div id="hint">Drag to pan, scroll to zoom (Ctrl/⌘+scroll on a stacked layout). <kbd>F</kbd> fits. Tab reaches devices, Enter selects.</div>
   <div id="pmview" class="pmbox"><div class="empty">Run a trace to see its path map.</div></div>
-  <div id="busy" role="group" tabindex="-1" aria-label="Trace running"><div class="bx"><div class="brow"><div class="spin" aria-hidden="true"></div><span id="busytxt" role="status" aria-live="polite">Tracing…</span></div>
+  <div id="busy" role="group" tabindex="-1" aria-label="Trace running"><div class="bx"><div class="brow"><div class="spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><span id="busytxt" role="status" aria-live="polite">Tracing…</span></div>
     <button id="cancel2" class="cancelbtn" type="button" title="Cancel the running trace (Esc)">Cancel trace (Esc)</button>
     <div class="bnote">Cancel stops the trace before its next device or API request. A request already sent finishes first (bounded by its timeout), then the trace ends INCOMPLETE and keeps the hops found so far.</div></div></div>
 </main>
 
 <section id="sim" aria-label="Packet flow and event list">
-  <div id="simbar" role="toolbar" aria-label="Packet flow controls"><b>Simulation</b>
-    <button class="ctl" id="first" title="First (Home)" aria-label="First step">⏮</button><button class="ctl" id="prev" title="Back (←)" aria-label="Step back">◀</button>
-    <button class="ctl" id="play" title="Play / pause (Space)" aria-label="Play packet flow">▶</button><button class="ctl" id="next" title="Step (→)" aria-label="Step forward">▶|</button>
-    <button class="ctl" id="last" title="Last (End)" aria-label="Last step">⏭</button><button class="ctl" id="replay" title="Replay from source (R)" aria-label="Replay packet flow">↻ Replay</button>
+  <div id="simbar" role="toolbar" aria-label="Packet flow controls"><b>Playback</b>
+    <button class="ctl" id="first" title="First (Home)" aria-label="First step"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3v10M12 3L7 8l5 5"/></svg></button><button class="ctl" id="prev" title="Back (←)" aria-label="Step back"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg></button>
+    <button class="ctl" id="play" title="Play / pause (Space)" aria-label="Play packet flow"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="i-play" d="M5.5 3.2l7 4.8-7 4.8z"/><path class="i-pause" d="M5.5 3.5v9M10.5 3.5v9"/></svg></button><button class="ctl" id="next" title="Step (→)" aria-label="Step forward"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></button>
+    <button class="ctl" id="last" title="Last (End)" aria-label="Last step"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12 3v10M4 3l5 5-5 5"/></svg></button><button class="ctl" id="replay" title="Replay from source (R)" aria-label="Replay packet flow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3"/></svg>Replay</button>
     <input type="range" id="scrub" min="0" max="0" value="0" step="1" aria-label="Position in the trace" disabled>
     <span id="stepinfo" role="status" aria-live="polite" title="no trace">no trace</span>
-    <span class="sp"></span><label for="speed">speed</label>
+    <span class="sp"></span><label for="speed">Speed</label>
     <select id="speed" aria-label="Animation speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option></select>
   </div>
-  <div id="events"><div class="empty">Pick a scenario on the left or enter a flow above. Each hop appears here like a simulation event list; the packet moves across the topology as you step.</div></div>
+  <div id="events"><div class="empty">Pick a scenario on the left or enter a flow above. Each hop is listed here in path order, and the packet moves across the topology as you step.</div></div>
   <div id="kbhint"><kbd>Space</kbd> play / pause · <kbd>←</kbd> <kbd>→</kbd> step · <kbd>Home</kbd> <kbd>End</kbd> first / last · <kbd>R</kbd> replay · <kbd>F</kbd> fit · <kbd>Z</kbd> zoom to path</div>
 </section>
 
@@ -250,13 +312,18 @@ const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAl
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const RM = matchMedia("(prefers-reduced-motion: reduce)"); // reduced motion: no auto-play, no tweening; step controls only
 const STACKED = matchMedia("(max-width: 900px)");         // stacked layout: the page scrolls, so the canvas must not trap the wheel
-const PKT_COLOR = {PASS:"#157a43", WARN:"#d9971c", UNKNOWN:"#d9971c", BLOCK:"#c62828", INFO:"#2f7de1"};
+const PKT_COLOR = {PASS:"#157a43", WARN:"#d9971c", UNKNOWN:"#6d3fc0", BLOCK:"#c62828", INFO:"#2f5bd8"};
 const FLOW_N = 6, FLOW_V = 0.14, FLOW_REVEAL = 600; // packets per edge, px per ms, ms to grow an edge (before speed scaling)
 const SEV = {BLOCK:4, UNKNOWN:3, WARN:2, PASS:1, INFO:0};
 const GLYPH = {PASS:"✓", BLOCK:"✕", WARN:"!", UNKNOWN:"?", INFO:"i"};
 const OGLYPH = {REACHABLE:"✓", BLOCKED:"✕", EXITED:"↗", INCOMPLETE:"?"};
 const S = {boot:null, topo:null, nodes:{}, links:{}, entry:null, steps:[], k:-1, playing:false, timer:null, anim:null, running:false,
-           sel:null, tab:"hop", view:"topo", scale:1, tx:0, ty:0, console:{}, ft:0, born:{}, fl:null, frozen:false, rv:null, touched:new Set()};
+           sel:null, tab:"hop", view:"topo", scale:1, tx:0, ty:0, console:{}, ft:0, born:{f:{}, r:{}}, fl:null, frozen:false, rv:null, touched:new Set(), hn:{}};
+const PKT_RET = {PASS:"#0b7285", WARN:"#d9971c", UNKNOWN:"#6d3fc0", BLOCK:"#c62828", INFO:"#2f5bd8"};   // return stream colours (teal family)
+const RET_OFF = 6;   // px: with a return trace the two streams are drawn side by side, each on the right of its own direction
+const allHops = () => S.entry ? S.entry.trace.Hops.concat((S.entry.trace.Return || {}).Hops || []) : [];
+const ovOf = st => st && st.dir === "r" ? S.entry.return_overlay : S.entry.overlay;
+const dirOf = k => (S.steps[k] && S.steps[k].dir) || "f";
 // status badge: glyph + word, so colour is never the only signal. `s` is escaped, never trusted.
 const badge = s => `<span class="pill ${esc(s)}"><span aria-hidden="true">${esc(GLYPH[s] || "•")}</span> ${esc(s)}</span>`;
 const setPressed = (sel, attr, val) => $$(sel).forEach(b => b.setAttribute("aria-pressed", String(b.dataset[attr] === val)));
@@ -278,7 +345,7 @@ async function api(path, body){
   let r;
   try { r = await fetch(path, {method: body ? "POST" : "GET", credentials: "same-origin", headers: {"X-Nettrace-Client": "1", ...(body ? {"Content-Type":"application/json"} : {})},
                                body: body ? JSON.stringify(body) : undefined}); }
-  catch (e) { throw new ApiError("Cannot reach the nettrace server. Is `nettrace serve` still running? Restart it and reload this page.", 0); }
+  catch (e) { throw new ApiError("Cannot reach the Norn server. Is `nettrace serve` still running? Restart it and reload this page.", 0); }
   const data = await r.json().catch(() => ({error: `HTTP ${r.status}`}));
   if (!r.ok) throw new ApiError(explain(r.status, data.error), r.status);
   return data;
@@ -288,20 +355,22 @@ $("#err").onclick = () => $("#err").style.display = "none";
 
 /* ===== C. topology rendering ===== */
 function depth(g){ let d = 0, p = g.parent; const by = Object.fromEntries(S.topo.groups.map(x => [x.id, x])); while (p && by[p]) { d++; p = by[p].parent; } return d; }
-const GSTYLE = {prisma:["#fff4e8","#f08a24","#a3561b"], site:["#f3f6fa","#8a9bb3","#3e4d63"], aws:["#fffaf2","#f29d38","#9a5a10"],
-                account:["#fffdf8","#e2a457","#8a5a1a"], vpc:["#eef8ee","#5aa95a","#2f6e2f"]};
+// Container tints (fill, stroke, label) are soft and conventional: they locate a node, they never signal status.
+// Status on the canvas is always the saturated ring, segment and packet colours.
+const GSTYLE = {prisma:["#fff6ec","#eaa567","#8f4f12"], site:["#f1f5fc","#9fb2d3","#33466b"], aws:["#fffaf0","#ecb467","#855309"],
+                account:["#fffdf8","#e0b77d","#7d541b"], vpc:["#f0f8f1","#86be8d","#2c6537"]};
 function linkKey(a, b){ return a < b ? `${a}|${b}` : `${b}|${a}`; }
 function renderTopology(){
   const T = S.topo, [W, H] = T.size, I = S.boot.icons;
   S.nodes = Object.fromEntries(T.nodes.map(n => [n.id, n]));
   S.links = Object.fromEntries(T.links.map(l => [linkKey(l.a, l.b), l]));
   let s = `<svg id="topo" xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="group" aria-label="Network topology">
-  <defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="#dbe4ee" stroke-width="1"/></pattern></defs>
+  <defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="1.2" cy="1.2" r="1.2" fill="#cfd6d2"/></pattern></defs>
   <rect width="${W}" height="${H}" fill="url(#grid)"/>`;
   for (const g of [...T.groups].sort((a, b) => depth(a) - depth(b))) {
     const [f, st, tc] = GSTYLE[g.kind] || GSTYLE.site, dash = g.kind === "account" ? ' stroke-dasharray="8 5"' : "";
-    s += `<g class="group"><rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="14" fill="${f}" fill-opacity=".92" stroke="${st}" stroke-width="1.6"${dash}/>
-      <text x="${g.x + 14}" y="${g.y + 21}" fill="${tc}" style="font:700 12px sans-serif;letter-spacing:.02em">${esc(g.label)}</text></g>`;
+    s += `<g class="group"><rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="14" fill="${f}" stroke="${st}" stroke-width="1.2"${dash}/>
+      <text x="${g.x + 14}" y="${g.y + 22}" fill="${tc}" style="font:600 12px system-ui,sans-serif">${esc(g.label)}</text></g>`;
   }
   for (const l of T.links) {
     const a = S.nodes[l.a], b = S.nodes[l.b]; if (!a || !b) continue;
@@ -316,7 +385,7 @@ function renderTopology(){
   s += `<g id="ov"></g><g id="flow" pointer-events="none"></g>`;
   for (const n of T.nodes) {
     s += `<g class="node" data-node="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.label)}${n.sub ? ", " + esc(n.sub) : ""}" transform="translate(${n.x},${n.y})"><title>${esc(n.label)} — ${esc(n.sub || "")}</title>
-      <rect class="ring" x="-35" y="-35" width="70" height="70" rx="16" style="display:none"/>
+      <rect class="ping" x="-35" y="-35" width="70" height="70" rx="16"/><rect class="ring" x="-35" y="-35" width="70" height="70" rx="16" style="display:none"/>
       <rect class="tile" x="-29" y="-29" width="58" height="58" rx="13"/>
       <g transform="scale(.86)">${I[n.kind] || I.generic}</g>
       <text class="lbl" y="47" text-anchor="middle">${esc(n.label)}</text>
@@ -324,28 +393,33 @@ function renderTopology(){
   }
   s += `</svg>`;
   $("#stage").innerHTML = s;
-  fit();
+  fit(false);
 }
 function nodeEl(id){ return document.querySelector(`#topo .node[data-node="${CSS.escape(id)}"]`); }
 
 /* ===== D. pan / zoom (wheel zoom yields to page scroll on the stacked layout) ===== */
-function apply(){ $("#stage").style.transform = `translate(${S.tx}px,${S.ty}px) scale(${S.scale})`; }
-function fitBox(x0, y0, x1, y1, maxScale = 1.25){
+function apply(glide){ const st = $("#stage"); st.classList.toggle("glide", !!glide && !RM.matches); st.style.transform = `translate(${S.tx}px,${S.ty}px) scale(${S.scale})`; }
+function fitBox(x0, y0, x1, y1, maxScale = 1.25, glide = true){
   const r = $("#canvas").getBoundingClientRect(), pad = 40;
   S.scale = Math.min((r.width - 2 * pad) / (x1 - x0), (r.height - 2 * pad - 30) / (y1 - y0), maxScale);
-  S.tx = (r.width - (x1 - x0) * S.scale) / 2 - x0 * S.scale; S.ty = (r.height - (y1 - y0) * S.scale) / 2 - y0 * S.scale + 14; apply();
+  S.tx = (r.width - (x1 - x0) * S.scale) / 2 - x0 * S.scale; S.ty = (r.height - (y1 - y0) * S.scale) / 2 - y0 * S.scale + 14; apply(glide);
 }
-function fit(){ if (S.topo) fitBox(0, 0, S.topo.size[0], S.topo.size[1]); }
-function focusPath(){
-  const ids = S.entry ? S.entry.overlay.path.concat(S.entry.overlay.dest.node ? [S.entry.overlay.dest.node] : []) : [];
-  const pts = ids.map(i => S.nodes[i]).filter(Boolean); if (!pts.length) return fit();
-  fitBox(Math.min(...pts.map(p => p.x)) - 110, Math.min(...pts.map(p => p.y)) - 80, Math.max(...pts.map(p => p.x)) + 110, Math.max(...pts.map(p => p.y)) + 90, 1.4);
+function fit(glide = true){ if (S.topo) fitBox(0, 0, S.topo.size[0], S.topo.size[1], 1.25, glide); }
+function focusPath(glide = true){
+  const ids = S.entry ? pathNodes() : [];
+  const pts = ids.map(i => S.nodes[i]).filter(Boolean); if (!pts.length) return fit(glide);
+  fitBox(Math.min(...pts.map(p => p.x)) - 110, Math.min(...pts.map(p => p.y)) - 80, Math.max(...pts.map(p => p.x)) + 110, Math.max(...pts.map(p => p.y)) + 90, 1.4, glide);
 }
-function zoomAt(mx, my, k){
+// every node either direction touches (forward and return paths plus their destinations)
+function pathNodes(){
+  const out = []; for (const ov of [S.entry.overlay, S.entry.return_overlay]) if (ov) out.push(...ov.path, ...(ov.dest.node ? [ov.dest.node] : []));
+  return out;
+}
+function zoomAt(mx, my, k, glide){
   const ns = Math.min(3, Math.max(0.2, S.scale * k));
-  S.tx = mx - (mx - S.tx) * ns / S.scale; S.ty = my - (my - S.ty) * ns / S.scale; S.scale = ns; apply();
+  S.tx = mx - (mx - S.tx) * ns / S.scale; S.ty = my - (my - S.ty) * ns / S.scale; S.scale = ns; apply(glide);
 }
-function zoomCentre(k){ const r = $("#canvas").getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, k); }
+function zoomCentre(k){ const r = $("#canvas").getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, k, true); }
 function bindCanvas(){
   const c = $("#canvas"); let drag = null, moved = false;
   c.addEventListener("mousedown", e => { drag = {x: e.clientX - S.tx, y: e.clientY - S.ty}; moved = false; c.classList.add("drag"); });
@@ -365,7 +439,7 @@ bindCanvas();
 // INCOMPLETE (and anything unrecognised) is "unverified", never green. Exit codes mirror `nettrace trace run`.
 const VERDICT = {
   REACHABLE:  {cls:"REACHABLE",  icon:"✓", label:"Reachable",  exit:0, meaning:"success: the destination was reached"},
-  EXITED:     {cls:"EXITED",     icon:"↗", label:"Exited known network", exit:0, meaning:"success so far: traffic left the networks nettrace knows; the rest of the path is not verified"},
+  EXITED:     {cls:"EXITED",     icon:"↗", label:"Exited known network", exit:0, meaning:"success so far: traffic left the networks Norn knows; the rest of the path is not verified"},
   BLOCKED:    {cls:"BLOCKED",    icon:"✕", label:"Blocked",    exit:3, meaning:"blocked: a hop denied the flow"},
   INCOMPLETE: {cls:"INCOMPLETE", icon:"?", label:"Unverified (incomplete)", exit:4, meaning:"not verified: the trace could not finish; do not treat this as reachable"},
 };
@@ -375,20 +449,52 @@ function verdictStop(t){
   const last = hops[hops.length - 1];
   return last ? {hop: last, label: t.Outcome === "REACHABLE" ? "Reached via" : "Last hop"} : null;
 }
-function verdictHtml(t){
-  const v = VERDICT[t.Outcome] || VERDICT.INCOMPLETE, stop = verdictStop(t), name = VERDICT[t.Outcome] ? v.label : `Unverified (${t.Outcome})`;
+// With a return trace, a delivered forward path is judged by the way back as well (mirrors output.exit_code):
+// return blocked -> 3, return unverified or symmetry UNKNOWN -> 4. An asymmetric path is still delivered (0, with a warning).
+function effectiveVerdict(t){
+  const base = VERDICT[t.Outcome] || VERDICT.INCOMPLETE, r = t.Return;
+  if (!r || t.Outcome !== "REACHABLE") return base;
+  if (r.Outcome === "BLOCKED") return {cls:"BLOCKED", icon:"✕", label:"Reachable, return path blocked", exit:3, meaning:"blocked: the request is delivered but the reply is denied by a stateless hop on the way back"};
+  if (r.Outcome === "INCOMPLETE" || (r.Symmetry || {}).status === "UNKNOWN")
+    return {cls:"INCOMPLETE", icon:"?", label:"Delivered, return path unverified", exit:4, meaning:"not verified: the way back could not be checked; do not treat this as proven both ways"};
+  return base;
+}
+const SYM_GLYPH = {SYMMETRIC:"✓", ASYMMETRIC:"⚠", UNKNOWN:"?", NOT_RUN:"–"};
+function symmetryLine(t){
+  const r = t.Return; if (!r) return "";
+  const sy = r.Symmetry || {}, st = sy.status || "UNKNOWN", first = st === "ASYMMETRIC" || st === "SYMMETRIC" ? (sy.details || [])[0] || r.Reason || "" : r.Reason || (sy.details || [])[0] || "";
+  const idx = (r.Hops || [])[0] ? r.Hops[0].index : null;
+  return `<span><b>Return path</b><span class="sym sym-${esc(st)}"><span aria-hidden="true">${esc(SYM_GLYPH[st] || "?")}</span> ${esc(st)}</span> ${esc(first)}`
+    + (idx != null ? ` <button type="button" class="lnk" data-gohop="${esc(idx)}">show return hops</button>` : "") + `</span>`;
+}
+function verdictHtml(t, exitCode){
+  const v = effectiveVerdict(t), stop = verdictStop(t), name = (VERDICT[t.Outcome] || t.Return) ? v.label : `Unverified (${t.Outcome})`;
+  const code = exitCode ?? v.exit;
   const where = stop ? `<span><b>${esc(stop.label)}</b><button type="button" class="lnk" data-gohop="${esc(stop.hop.index)}">#${esc(stop.hop.index)} ${esc(stop.hop.node)}</button> (${esc(stop.hop.domain)} ${esc(stop.hop.component)}, ${esc(stop.hop.status)})</span>`
     : `<span><b>Stopped at</b>no hops recorded</span>`;
   return `<span class="vt"><span class="vi" aria-hidden="true">${esc(v.icon)}</span>${esc(name)}</span><div class="vm">${where}`
     + (t.Cancelled ? `<span><b>Cancelled</b>by user; the hops shown are those found before it stopped</span>` : "")
-    + `<span><b>Reason</b>${esc(t.Reason)}</span><span><b>Exit code</b>${esc(v.exit)}: ${esc(v.meaning)}</span></div>`;
+    + `<span><b>Reason</b>${esc(t.Reason)}</span>` + symmetryLine(t) + `<span><b>Exit code</b>${esc(code)}: ${esc(v.meaning)}</span></div>`;
 }
-function renderVerdict(t){
-  const v = $("#verdict"), cls = (VERDICT[t.Outcome] || VERDICT.INCOMPLETE).cls;
-  v.className = `on V-${cls}`; v.innerHTML = verdictHtml(t);
+// One tick per step, in path order: the shape of the whole result at a glance. Glyph + colour, and each tick jumps to its step.
+function stripHtml(){
+  let s = "", ret = false;
+  S.steps.forEach((st, i) => {
+    if (st.dir === "r" && !ret) { ret = true; s += `<span class="tksep" aria-hidden="true">↩</span>`; }
+    const out = st.dir === "r" ? S.entry.trace.Return.Outcome : S.entry.trace.Outcome;
+    const status = st.hop ? st.hop.status : out === "REACHABLE" ? "PASS" : "INFO";
+    const what = (st.hop ? `#${st.hop.index} ${st.hop.node}: ${st.hop.status}` : st.dir === "r" ? "back at the source" : "destination") + (st.dir === "r" && st.hop ? " (return path)" : "");
+    s += `<button type="button" class="tk ${esc(status)}" data-gostep="${i}" style="--i:${i}" title="${esc(what)}" aria-label="${esc(what)}"><span aria-hidden="true">${esc(GLYPH[status] || "•")}</span></button>`;
+  });
+  return `<div id="vstrip" role="group" aria-label="Every hop, in path order">${s}</div>`;
+}
+function renderVerdict(t, exitCode){
+  const v = $("#verdict"), cls = effectiveVerdict(t).cls;
+  v.className = `on V-${cls}`; v.innerHTML = verdictHtml(t, exitCode) + stripHtml();
 }
 function jumpToHop(idx){ const i = S.steps.findIndex(s => s.hop && String(s.hop.index) === String(idx)); if (i >= 0) { stop(); goto(i); } }
 document.addEventListener("click", e => { const b = e.target.closest("[data-gohop]"); if (b) jumpToHop(b.dataset.gohop); });
+document.addEventListener("click", e => { const b = e.target.closest("[data-gostep]"); if (b) { stop(); goto(+b.dataset.gostep); } });
 
 /* ===== F. trace form: validation, running state, remembered values (memory only) ===== */
 const TOKEN_RE = /^[A-Za-z0-9._@\\-]{1,64}$/;
@@ -418,7 +524,7 @@ function validateForm(all){
 function setRunning(on){
   S.running = on; $("#ws").setAttribute("aria-busy", String(on));
   $$("#form input, #form select, #run, .preset, .hist").forEach(el => el.disabled = on);
-  $("#run").textContent = on ? "Tracing…" : "▶ Trace"; $("#busy").style.display = on ? "flex" : "none";
+  $("#run").textContent = on ? "Tracing…" : "Trace"; $("#busy").style.display = on ? "flex" : "none";
   $("#cancel").hidden = !on; S.cancelling = false; $$(".cancelbtn").forEach(b => b.disabled = false);
   $("#busytxt").textContent = on ? (S.boot.mode === "demo" ? "Tracing through the simulated lab…"
     : "Tracing, querying devices (read-only). The server stops a trace at its timeout (120 s by default) or when you cancel.") : "";
@@ -451,12 +557,14 @@ async function cancelRun(){
   }
 }
 function formBody(){ return {src: $("#f-src").value.trim(), dst: $("#f-dst").value.trim(), protocol: $("#f-proto").value,
-  port: $("#f-port").value.trim(), application: $("#f-app").value.trim(), user: $("#f-user").value.trim(), start_at: $("#f-start").value}; }
+  port: $("#f-port").value.trim(), application: $("#f-app").value.trim(), user: $("#f-user").value.trim(), start_at: $("#f-start").value,
+  return: $("#f-return").checked}; }
 function fillForm(f){ $("#f-src").value = f.src || ""; $("#f-dst").value = f.dst || ""; $("#f-proto").value = f.protocol || "tcp";
   $("#f-port").value = f.port ?? ""; $("#f-app").value = f.application || ""; $("#f-user").value = f.user || ""; $("#f-start").value = f.start_at || "";
+  $("#f-return").checked = f.return === true;
   syncProto(); S.touched.clear(); validateForm(false); }
 // values persist for the life of the page (the inputs are never cleared); loading a past trace refills them from its flow
-function fillFromTrace(t){ const f = t.Flow || {}; fillForm({src: f.src, dst: f.dst, protocol: f.protocol, port: f.dst_port, application: f.application, user: f.user, start_at: $("#f-start").value}); }
+function fillFromTrace(t){ const f = t.Flow || {}; fillForm({src: f.src, dst: f.dst, protocol: f.protocol, port: f.dst_port, application: f.application, user: f.user, start_at: $("#f-start").value, return: !!t.Return}); }
 function syncProto(){ const icmp = $("#f-proto").value === "icmp"; $("#f-port").disabled = icmp || S.running; if (icmp) { $("#f-port").value = ""; $("#f-port").setAttribute("aria-invalid", "false"); } }
 function submitForm(ev){
   ev.preventDefault(); if (S.running) return;
@@ -482,11 +590,19 @@ $("#busy").addEventListener("keydown", e => { if (e.key === "Escape") { e.preven
 function loadEntry(entry, opts = {}){
   stop(); S.entry = entry;
   const t = entry.trace, ov = entry.overlay;
-  S.steps = t.Hops.map(h => ({hop: h, pidx: ov.step_index[String(h.index)] ?? 0}));
+  const rov = entry.return_overlay, ret = t.Return;
+  S.hn = {...ov.hop_nodes, ...(rov ? rov.hop_nodes : {})};   // hop numbers are unique across both directions
+  S.steps = t.Hops.map(h => ({hop: h, pidx: ov.step_index[String(h.index)] ?? 0, dir: "f"}));
   const lastIdx = S.steps.length ? S.steps[S.steps.length - 1].pidx : 0;
-  if (ov.dest.reached && ov.path.length - 1 > lastIdx) S.steps.push({hop: null, pidx: ov.path.length - 1, final: true});
-  renderVerdict(t); renderSummary(entry);
-  renderEvents(); $("#pmview").innerHTML = entry.map_svg; bindPathMap($("#pmview")); fitPm($("#pmview"));
+  if (ov.dest.reached && ov.path.length - 1 > lastIdx) S.steps.push({hop: null, pidx: ov.path.length - 1, final: true, dir: "f"});
+  if (ret && rov) {
+    S.steps.push(...ret.Hops.map(h => ({hop: h, pidx: rov.step_index[String(h.index)] ?? 0, dir: "r"})));
+    const rl = ret.Hops.length ? rov.step_index[String(ret.Hops[ret.Hops.length - 1].index)] ?? 0 : 0;
+    if (rov.dest.reached && rov.path.length - 1 > rl) S.steps.push({hop: null, pidx: rov.path.length - 1, final: true, dir: "r"});
+  }
+  S.born = {f: {}, r: {}};
+  renderVerdict(t, entry.exit_code); renderSummary(entry);
+  renderEvents(); $("#pmview").innerHTML = entry.map_svg + (ret ? `<div class="pmnote">Path map: forward path only. The return path is on the topology and in the event list.</div>` : ""); bindPathMap($("#pmview")); fitPm($("#pmview"));
   $$("#presets .preset").forEach(p => { const on = p.dataset.id === entry.preset; p.classList.toggle("on", on); p.setAttribute("aria-pressed", String(on)); });
   syncPresetTab(); if (!S.labTouched) setLab(false);
   location.hash = `trace=${entry.id}`;
@@ -497,82 +613,116 @@ function loadEntry(entry, opts = {}){
   else { goto(0, false); focusPath(); if (opts.autoplay !== false && !RM.matches) setTimeout(play, 350); }
 }
 function renderSummary(entry){
-  const t = entry.trace, warn = (t.Warnings || []).map(w => `<li>${esc(w)}</li>`).join("");
+  const t = entry.trace, warn = (t.Warnings || []).map(w => `<li>${esc(w)}</li>`).join(""), ret = t.Return;
   $("#summary").innerHTML = `<b>${esc(entry.title)}</b>`
     + (t.FinalFlow && t.FinalFlow.dst !== t.Flow.dst ? ` <span class="lab">→ NAT ${esc(t.FinalFlow.dst)}:${esc(t.FinalFlow.dst_port ?? "")}</span>` : "")
     + (warn ? `<ul aria-label="Warnings">${warn}</ul>` : "")
-    + `<div class="r" style="font-size:11.5px">${esc(t.Hops.length)} hops · ${esc(entry.elapsed_ms)} ms · read-only queries only</div>`;
+    + (ret ? `<div class="r" style="font-size:11.5px">Return flow: ${esc(flowText(ret.Flow))} · symmetry <span class="sym sym-${esc((ret.Symmetry || {}).status)}">${esc((ret.Symmetry || {}).status)}</span></div>` : "")
+    + `<div class="r" style="font-size:11.5px">${esc(t.Hops.length)} hops${ret ? ` + ${esc((ret.Hops || []).length)} return hops` : ""} · ${esc(entry.elapsed_ms)} ms · read-only queries only</div>`;
 }
+function flowText(f){ f = f || {}; return `${f.src} → ${f.dst}${f.dst_port ? ":" + f.dst_port : ""}${f.src_port ? " (from port " + f.src_port + ")" : ""} ${f.protocol || ""}`; }
 function dimOffPath(on){
-  const onPath = new Set(on && S.entry ? S.entry.overlay.path.concat(S.entry.overlay.dest.node ? [S.entry.overlay.dest.node] : []) : []);
+  const onPath = new Set(on && S.entry ? pathNodes() : []);
   $$("#topo .node").forEach(n => n.classList.toggle("dim", on && onPath.size > 0 && !onPath.has(n.dataset.node)));
   $$("#topo .link").forEach(l => { const [a, b] = l.dataset.l.split("|"); l.classList.toggle("dim", on && onPath.size > 0 && !(onPath.has(a) && onPath.has(b))); });
 }
 
 /* ===== H. simulation: overlay, packet stream, playback ===== */
-function nodeAtStep(k){ const st = S.steps[k]; return st ? S.entry.overlay.path[st.pidx] : null; }
-function statusUpTo(k){
-  const out = {}, hn = S.entry.overlay.hop_nodes;
+function nodeAtStep(k){ const st = S.steps[k]; return st ? ovOf(st).path[st.pidx] : null; }
+// Node status after step k. `dir` limits it to one direction ("f" / "r"); without it both directions are merged (the rings).
+function statusUpTo(k, dir){
+  const out = {};
   for (let i = 0; i <= k && i < S.steps.length; i++) {
-    const st = S.steps[i]; let nid, s;
-    if (st.final) { nid = S.entry.overlay.path[st.pidx]; s = S.entry.trace.Outcome === "REACHABLE" ? "PASS" : "INFO"; }
-    else { nid = hn[String(st.hop.index)]; s = st.hop.status; }
+    const st = S.steps[i]; if (dir && st.dir !== dir) continue;
+    let nid, s;
+    if (st.final) { const o = ovOf(st), okOut = st.dir === "r" ? S.entry.trace.Return.Outcome : S.entry.trace.Outcome; nid = o.path[st.pidx]; s = okOut === "REACHABLE" ? "PASS" : "INFO"; }
+    else { nid = S.hn[String(st.hop.index)]; s = st.hop.status; }
     if (!nid) continue; if (!(nid in out) || SEV[s] > SEV[out[nid]]) out[nid] = s;
   }
   return out;
 }
 function center(id){ const n = S.nodes[id]; return n ? [n.x, n.y] : null; }
-function drawOverlay(k){
-  const ov = S.entry.overlay, path = ov.path, upto = S.steps[k] ? S.steps[k].pidx : 0, st = statusUpTo(k);
+function edgeEnds(path, i, off){   // a -> b of edge i, moved `off` px to the right of its own direction
+  const a = center(path[i]), b = center(path[i + 1]); if (!a || !b) return null;
+  if (!off) return [a, b];
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / len * off, ny = (b[0] - a[0]) / len * off;
+  return [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny]];
+}
+function segLayer(path, upto, st, dir, off){
   let s = "";
   for (let i = 0; i < upto; i++) {
-    const a = center(path[i]), b = center(path[i + 1]); if (!a || !b) continue;
+    const e = edgeEnds(path, i, off); if (!e) continue;
     const virt = !S.links[linkKey(path[i], path[i + 1])] ? " virt" : "", ls = st[path[i]], cls = ["BLOCK", "WARN", "UNKNOWN"].includes(ls) ? ls : "PASS";
-    s += pathSeg(a, b, `seg ${cls}${virt}${RM.matches ? " rm" : " base"}${i === upto - 1 && S.playing && !RM.matches ? " live" : ""}`);
+    const age = S.ft - (S.born[dir][i] ?? -1e9), fresh = !RM.matches && age < FLOW_REVEAL;   // still being revealed: resume the draw where it is
+    const anim = !fresh ? "" : dir === "r" || virt ? " fade" : " draw";
+    s += pathSeg(e[0], e[1], `seg ${cls}${dir === "r" ? " ret" : ""}${virt}${RM.matches ? " rm" : " base"}${anim}`,
+      fresh ? ` pathLength="1" style="--rv:${Math.round(FLOW_REVEAL / speed())}ms;animation-delay:-${Math.round(Math.max(0, age) / speed())}ms"` : "");
   }
-  const lastK = k === S.steps.length - 1, dest = ov.dest.node;
-  if (lastK && dest && !ov.dest.reached && path.length) {
+  return s;
+}
+// "forward" / "return" captions beside the first edge of each stream (only when a return trace exists)
+function dirLabel(path, upto, dir, off){
+  if (upto < 1) return "";
+  const e = edgeEnds(path, 0, off * 2.6); if (!e) return "";
+  return `<text class="retlbl ${dir}" x="${(e[0][0] + e[1][0]) / 2}" y="${(e[0][1] + e[1][1]) / 2}" text-anchor="middle">${dir === "r" ? "← return" : "forward →"}</text>`;
+}
+function drawOverlay(k){
+  const fo = S.entry.overlay, ro = S.entry.return_overlay, st0 = S.steps[k], inRet = dirOf(k) === "r";
+  const stF = statusUpTo(k, "f"), stR = statusUpTo(k, "r"), st = statusUpTo(k);
+  const upF = inRet ? Math.max(fo.path.length - 1, 0) : (st0 ? st0.pidx : 0), upR = inRet ? st0.pidx : 0, off = ro ? RET_OFF : 0;
+  let s = segLayer(fo.path, upF, stF, "f", off) + (ro ? segLayer(ro.path, upR, stR, "r", off) : "");
+  if (ro) s += dirLabel(fo.path, upF, "f", off) + dirLabel(ro.path, upR, "r", off);
+  const cur = inRet ? ro : fo, path = cur.path, upto = inRet ? upR : upF;
+  const lastK = k === S.steps.length - 1, dest = cur.dest.node;
+  if (lastK && dest && !cur.dest.reached && path.length) {
     const a = center(path[Math.min(upto, path.length - 1)]), b = center(dest); if (a && b && dest !== path[upto]) s += pathSeg(a, b, "seg todo");
   }
   $("#ov").innerHTML = s;
-  buildFlow(path, upto, st, k);
+  buildFlow(k, stF, stR, upF, upR, off);
   $$("#topo .node").forEach(n => {
     const id = n.dataset.node, s2 = st[id], ring = n.querySelector(".ring");
     n.classList.remove("st-PASS", "st-BLOCK", "st-WARN", "st-UNKNOWN", "st-INFO", "cur");
     ring.style.display = s2 ? "" : "none"; if (s2) n.classList.add("st-" + s2);
     let mark = "";
     if (s2 && s2 !== "INFO") { const c = PKT_COLOR[s2], g = {PASS:"✓", BLOCK:"✕", WARN:"!", UNKNOWN:"?"}[s2];
-      mark = `<circle cx="29" cy="-29" r="10" fill="${c}" stroke="#fff" stroke-width="2"/><text x="29" y="-24.5" text-anchor="middle" fill="#fff" style="font:700 12px sans-serif">${g}</text>`; }
-    if (lastK && id === dest && !ov.dest.reached && !s2) mark += `<rect x="-35" y="-35" width="70" height="70" rx="16" fill="none" stroke="#8795a8" stroke-width="2.5" stroke-dasharray="5 4"/>`
-      + `<text y="-42" text-anchor="middle" style="font:700 10px sans-serif;fill:#4d5b6e;letter-spacing:.06em">NOT REACHED</text>`;
-    if (s2 === "BLOCK" && isBad(k) && id === nodeAtStep(k)) mark += `<text y="-42" text-anchor="middle" style="font:700 10px sans-serif;fill:#c62828;letter-spacing:.06em">BLOCKED HERE</text>`;
+      mark = `<circle cx="29" cy="-29" r="10" fill="${c}" stroke="#fff" stroke-width="2"/><text x="29" y="-24.5" text-anchor="middle" fill="${s2 === "WARN" ? "#1a1300" : "#fff"}" style="font:700 12px system-ui,sans-serif">${g}</text>`; }
+    if (lastK && id === dest && !cur.dest.reached && !s2) mark += `<rect x="-35" y="-35" width="70" height="70" rx="16" fill="none" stroke="#87928c" stroke-width="2.5" stroke-dasharray="5 4"/>`
+      + `<text class="stamp" y="-42" text-anchor="middle" fill="#56605c">NOT REACHED</text>`;
+    if (s2 === "BLOCK" && isBad(k) && id === nodeAtStep(k)) mark += `<text class="stamp" y="-42" text-anchor="middle" fill="#c62828">${inRet ? "RETURN BLOCKED HERE" : "BLOCKED HERE"}</text>`;
     n.querySelector(".mark").innerHTML = mark;
   });
-  const cur = nodeAtStep(k); if (cur && nodeEl(cur)) nodeEl(cur).classList.add("cur");
+  const curN = nodeAtStep(k); if (curN && nodeEl(curN)) nodeEl(curN).classList.add("cur");
 }
-function pathSeg(a, b, cls){ return `<line class="${cls}" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`; }
+function pathSeg(a, b, cls, extra = ""){ return `<line class="${cls}" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"${extra}/>`; }
 function svgEl(tag, attrs){ const e = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
 // Packet stream: FLOW_N staggered packets (glow + comet tail + head) per reached edge, coloured by the status of the hop the edge leaves.
 // Only numbers and fixed colours are written to the DOM here; no trace text.
-function buildFlow(path, upto, st, k){
+function buildFlow(k, stF, stR, upF, upR, off){
   const g = $("#flow"); g.replaceChildren(); S.fl = null;
   if (RM.matches) return;
-  const E = [], bad = isBad(k);
-  for (let i = 0; i < upto; i++) {
-    const a = center(path[i]), b = center(path[i + 1]); if (!a || !b) continue;
-    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len, col = PKT_COLOR[st[path[i]]] || PKT_COLOR.PASS, ps = [];
-    for (let j = 0; j < FLOW_N; j++) {
-      const p = svgEl("g", {opacity: 0});
-      p.append(svgEl("circle", {r: 9, fill: col, opacity: .22}), svgEl("line", {x1: -ux * 28, y1: -uy * 28, x2: 0, y2: 0, stroke: col, "stroke-width": 4, "stroke-linecap": "round", opacity: .4}), svgEl("circle", {r: 4, fill: col}));
-      g.append(p); ps.push(p);
+  const E = [], bad = isBad(k), cd = dirOf(k), ro = S.entry.return_overlay;
+  const add = (path, upto, st, dir) => {
+    const pal = dir === "r" ? PKT_RET : PKT_COLOR;
+    for (let i = 0; i < upto; i++) {
+      const ends = edgeEnds(path, i, off); if (!ends) continue;
+      const [a, b] = ends, len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, ux = (b[0] - a[0]) / len, uy = (b[1] - a[1]) / len, col = pal[st[path[i]]] || pal.PASS, ps = [];
+      for (let j = 0; j < FLOW_N; j++) {
+        const p = svgEl("g", {opacity: 0});
+        p.append(svgEl("circle", {r: 9, fill: col, opacity: .16}), svgEl("line", {x1: -ux * 26, y1: -uy * 26, x2: 0, y2: 0, stroke: col, "stroke-width": 3.4, "stroke-linecap": "round", opacity: .42}),
+          svgEl("circle", {r: 4.2, fill: col}), svgEl("circle", {r: 1.6, fill: "#fff", opacity: .9}));
+        g.append(p); ps.push(p);
+      }
+      E.push({a, b, len, ux, uy, ps, blk: bad && dir === cd && i === upto - 1, born: S.born[dir][i] ?? -1e9});
     }
-    E.push({a, b, len, ux, uy, ps, blk: bad && i === upto - 1, born: S.born[i] ?? -1e9});
-  }
+  };
+  add(S.entry.overlay.path, upF, stF, "f");
+  if (ro) add(ro.path, upR, stR, "r");
   let pile = null;
-  if (bad && E.length && E[E.length - 1].blk) {   // packets pile up at the BLOCK node and fade
-    const e = E[E.length - 1], els = [];
+  const blkE = E.find(e => e.blk);
+  if (bad && blkE) {   // packets pile up at the BLOCK node and fade
+    const els = [];
     for (let m = 0; m < 5; m++) { const c = svgEl("circle", {r: 4, fill: PKT_COLOR.BLOCK, opacity: 0}); g.append(c); els.push(c); }
-    pile = {e, els};
+    pile = {e: blkE, els};
   }
   S.fl = {E, pile};
 }
@@ -584,6 +734,7 @@ function updateFlow(){
       let u = (S.ft * FLOW_V / e.len + j / FLOW_N) % 1, o = 1;
       if (e.blk) { o = 1 - u * u; u = 1 - (1 - u) * (1 - u); }   // slow down and fade into the block node
       if (u > front) { p.setAttribute("opacity", 0); return; }
+      o *= Math.min(1, u / .1, (1 - u) / .1);   // ease in and out at the two ends, so packets never pop
       p.setAttribute("transform", `translate(${e.a[0] + (e.b[0] - e.a[0]) * u},${e.a[1] + (e.b[1] - e.a[1]) * u})`); p.setAttribute("opacity", o);
     });
   }
@@ -599,16 +750,16 @@ function flowTick(now){
 // grow the edges between two steps from the source side; runs done() once the front arrives
 function reveal(fromK, toK, done){
   clearTimeout(S.rv);
-  const A = S.steps[fromK].pidx, B = S.steps[toK].pidx;
-  for (const i of Object.keys(S.born)) if (+i >= B) delete S.born[i];
+  const sf = S.steps[fromK], st = S.steps[toK], d = st.dir || "f", A = (sf.dir || "f") === d ? sf.pidx : 0, B = st.pidx;
+  for (const dd of ["f", "r"]) for (const i of Object.keys(S.born[dd])) if (dd !== d || +i >= B) delete S.born[dd][i];
   if (RM.matches || B <= A) { done && done(); return; }
-  for (let i = A; i < B; i++) S.born[i] = S.ft;
+  for (let i = A; i < B; i++) S.born[d][i] = S.ft;
   S.rv = setTimeout(() => done && done(), FLOW_REVEAL / speed());
 }
 function isBad(k){ const st = S.steps[k]; return st && st.hop && st.hop.status === "BLOCK"; }
 function speed(){ return +$("#speed").value; }
 function setStepInfo(t){ const e = $("#stepinfo"); e.textContent = t; e.title = t; }   // ellipsised by CSS; the title carries the full text
-function stepLabel(k){ const st = S.steps[k]; if (!st) return ""; return st.hop ? `${st.hop.status} at ${st.hop.node}` : "destination"; }
+function stepLabel(k){ const st = S.steps[k]; if (!st) return ""; const r = st.dir === "r" ? " (return path)" : ""; return (st.hop ? `${st.hop.status} at ${st.hop.node}` : "destination") + r; }
 function syncScrub(k){
   const sc = $("#scrub"); sc.disabled = !S.steps.length; sc.max = Math.max(0, S.steps.length - 1); sc.value = k;
   sc.setAttribute("aria-valuetext", `step ${k + 1} of ${S.steps.length}: ${stepLabel(k)}`);
@@ -616,11 +767,12 @@ function syncScrub(k){
 function goto(k, animate = true){
   if (!S.entry || !S.steps.length) return;
   k = Math.max(0, Math.min(S.steps.length - 1, k)); const from = S.k; S.k = k;
-  if (animate && !RM.matches && from >= 0 && from !== k) reveal(from, k); else S.born = {};
+  if (animate && !RM.matches && from >= 0 && from !== k) reveal(from, k); else S.born = {f: {}, r: {}};
   drawOverlay(k); syncScrub(k);
   $$("#events tr.ev").forEach((r, i) => { r.classList.toggle("cur", i === k); r.classList.toggle("future", i > k); if (i === k) r.setAttribute("aria-current", "step"); else r.removeAttribute("aria-current"); });
   revealRow($$("#events tr.ev")[k], "nearest");
-  setStepInfo(`step ${k + 1} / ${S.steps.length}`);
+  $$("#vstrip .tk").forEach((b, i) => { b.classList.toggle("cur", i === k); if (i === k) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current"); });
+  setStepInfo(`step ${k + 1} / ${S.steps.length}${dirOf(k) === "r" ? " · return" : ""}`);
   const st = S.steps[k];
   centerPathMap(st.hop ? st.hop.index : null);
   if (st.hop) { selectHop(st.hop.index, false); } else showFinal();
@@ -654,7 +806,7 @@ function play(){
   if (!S.entry || RM.matches) return;
   if (S.playing) { stop(); S.frozen = true; return; }   // pause freezes the stream too
   if (S.k >= S.steps.length - 1) goto(0, false);
-  S.playing = true; $("#play").textContent = "⏸"; $("#play").setAttribute("aria-label", "Pause packet flow");
+  S.playing = true; $("#play").classList.add("on"); $("#play").setAttribute("aria-label", "Pause packet flow");
   const stepOnce = () => {
     if (!S.playing) return;
     if (S.k >= S.steps.length - 1) return stop();
@@ -664,7 +816,7 @@ function play(){
   };
   stepOnce();
 }
-function stop(){ S.playing = false; S.frozen = false; clearTimeout(S.timer); $("#play").textContent = "▶"; $("#play").setAttribute("aria-label", "Play packet flow"); if (S.entry && S.k >= 0) drawOverlay(S.k); }
+function stop(){ S.playing = false; S.frozen = false; clearTimeout(S.timer); clearTimeout(S.rv); $("#play").classList.remove("on"); $("#play").setAttribute("aria-label", "Play packet flow"); if (S.entry && S.k >= 0) drawOverlay(S.k); }
 
 /* ===== I. event list (one-line hops, expandable detail) ===== */
 function hopDetailHtml(h){
@@ -675,18 +827,26 @@ function hopDetailHtml(h){
   return (rows ? `<dl class="kv">${rows}</dl>` : "") + (det ? `<ul class="det">${det}</ul>` : "") || `<span class="lab">No further detail for this hop.</span>`;
 }
 function eventRow(st, i, t, hn){
-  if (st.final) { const n = S.nodes[S.entry.overlay.path[st.pidx]];
-    return `<tr class="ev" tabindex="0" data-i="${i}"><td></td><td>✔</td><td>${badge("PASS")}</td><td>${esc(n ? n.label : "")}</td><td>Destination: ${esc(t.Reason)}</td></tr>`; }
+  if (st.final) { const n = S.nodes[ovOf(st).path[st.pidx]], back = st.dir === "r";
+    return `<tr class="ev" tabindex="0" data-i="${i}"><td></td><td></td><td>${badge("PASS")}</td><td>${esc(n ? n.label : "")}</td><td>${back ? "Back at the source" : "Destination"}: ${esc(back ? t.Return.Reason : t.Reason)}</td></tr>`; }
   const h = st.hop, n = S.nodes[hn[String(h.index)]], info = h.component + ": " + h.summary + (h.policy ? " · " + h.policy : "");
   return `<tr class="ev" tabindex="0" data-i="${i}" data-hopidx="${esc(h.index)}"><td><button type="button" class="xbtn" aria-expanded="false" aria-controls="dt-${i}" aria-label="Show details for hop ${esc(h.index)}"><span aria-hidden="true">▸</span></button></td>`
     + `<td>${esc(h.index)}</td><td>${badge(h.status)}</td><td title="${esc(h.node)}">${esc(n ? n.label : h.node)}</td><td title="${esc(info)}">${esc(info)}</td></tr>`
     + `<tr class="dt" id="dt-${i}" hidden><td colspan="5">${hopDetailHtml(h)}</td></tr>`;
 }
+// divider row before the return hops: direction, flow, return verdict and symmetry (all values escaped)
+function returnDivider(t){
+  const r = t.Return, sy = r.Symmetry || {}, st = sy.status || "UNKNOWN";
+  return `<tr class="rdiv"><td colspan="5"><span aria-hidden="true">↩</span> Return path: ${esc(flowText(r.Flow))}`
+    + `<span class="sym sym-${esc(st)}"><span aria-hidden="true">${esc(SYM_GLYPH[st] || "?")}</span> ${esc(st)}</span>`
+    + (r.Outcome ? ` · return ${esc(r.Outcome)}` : "") + `<div class="lab" style="font-weight:400">${esc(r.Reason)}</div></td></tr>`;
+}
 function renderEvents(){
-  const t = S.entry.trace, hn = S.entry.overlay.hop_nodes;
+  const t = S.entry.trace, hn = S.hn, nF = S.steps.filter(x => x.dir !== "r").length;
   let s = `<table aria-label="Hops in path order"><colgroup><col style="width:30px"><col style="width:36px"><col style="width:96px"><col style="width:150px"><col></colgroup>
     <tr><th><span class="sr">Details</span></th><th>#</th><th>Status</th><th>At</th><th>What happened</th></tr>`;
-  S.steps.forEach((st, i) => { s += eventRow(st, i, t, hn); });
+  S.steps.forEach((st, i) => { if (i === nF && t.Return) s += returnDivider(t); s += eventRow(st, i, t, hn); });
+  if (t.Return && nF === S.steps.length) s += returnDivider(t);   // return not run: the divider still says why
   $("#events").innerHTML = s + "</table>";
   $$("#events tr.ev").forEach((r, i) => {
     r.onclick = () => { stop(); goto(i); };
@@ -700,7 +860,7 @@ function toggleDetail(b){
 }
 // canvas node -> its hop rows: scroll the first into view and outline all of them
 function highlightHopsAt(nodeId){
-  const hn = S.entry ? S.entry.overlay.hop_nodes : {}, rows = $$("#events tr.ev").filter(r => r.dataset.hopidx && hn[r.dataset.hopidx] === nodeId);
+  const hn = S.entry ? S.hn : {}, rows = $$("#events tr.ev").filter(r => r.dataset.hopidx && hn[r.dataset.hopidx] === nodeId);
   $$("#events tr.hl").forEach(r => r.classList.remove("hl")); rows.forEach(r => r.classList.add("hl"));
   if (rows.length) revealRow(rows[0], "center");
   return rows.length;
@@ -713,27 +873,35 @@ function renderPane(){
   p.classList.toggle("pmtab", S.tab === "pm"); p.classList.remove("devtab");
   if (S.tab === "hop") p.innerHTML = S.hopHtml || `<p class="empty">Step through a trace to inspect each hop: the decision, policy, NAT and the raw read-only requests behind it.</p>`;
   else if (S.tab === "device") renderDevice();
-  else if (S.tab === "pm") { p.innerHTML = S.entry ? `<div class="pmbox" id="pmi">${S.entry.map_svg}</div><p class="lab">Click a device, SG/NACL badge or link to jump to that hop.</p>` : `<p class="empty">No trace yet. Run one to see its path map.</p>`; bindPathMap(p); fitPm($("#pmi")); centerPathMap(curHopIndex(), $("#pmi")); }
+  else if (S.tab === "pm") { p.innerHTML = S.entry ? `<div class="pmbox" id="pmi">${S.entry.map_svg}</div><p class="lab">Click a device, SG/NACL badge or link to jump to that hop.${S.entry.trace.Return ? " This map shows the forward path only." : ""}</p>` : `<p class="empty">No trace yet. Run one to see its path map.</p>`; bindPathMap(p); fitPm($("#pmi")); centerPathMap(curHopIndex(), $("#pmi")); }
   else if (S.tab === "json") p.innerHTML = S.entry ? `<pre style="max-height:none">${esc(JSON.stringify(S.entry.trace, null, 2))}</pre>` : `<p class="empty">No trace yet.</p>`;
 }
 function bindPathMap(root){ root.querySelectorAll("[data-hop]").forEach(el => el.addEventListener("click", () => {
   const i = S.steps.findIndex(s => s.hop && String(s.hop.index) === el.dataset.hop); if (i >= 0) { stop(); goto(i); setTab("hop"); } })); }
 function selectHop(idx, switchTab = true){
-  const h = S.entry.trace.Hops.find(x => x.index == idx); if (!h) return;
-  const nid = S.entry.overlay.hop_nodes[String(idx)], n = S.nodes[nid];
+  const h = allHops().find(x => x.index == idx); if (!h) return;
+  const nid = S.hn[String(idx)], n = S.nodes[nid];
   const loc = Object.entries(h.location || {}).map(([k, v]) => `${esc(k)}=${esc(v)}`).join(", ");
   const rows = [["status", badge(h.status)], ["type", `${esc(h.domain)} ${esc(h.component)}`],
     ["on map", n ? `<a href="#" data-node="${esc(nid)}">${esc(n.label)}</a>` : "—"], ["ingress", esc(h.ingress)], ["egress", esc(h.egress)],
     ["policy", esc(h.policy)], ["NAT", esc(h.nat)], ["location", loc]].filter(r => r[1]).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
   const det = (h.details || []).map(d => `<li>${esc(d)}</li>`).join("");
   const ev = (h.evidence || []).map(e => `<details class="ev"><summary>[${esc(e.source)}] ${esc(e.request)}</summary><pre>${esc(e.response)}</pre></details>`).join("");
-  S.hopHtml = `<h3>#${esc(h.index)} ${esc(h.node)}</h3><p class="lead">${esc(h.summary)}</p><dl class="kv">${rows}</dl>`
+  const back = (S.entry.trace.Return || {}).Hops && S.entry.trace.Return.Hops.some(x => x.index == idx);
+  S.hopHtml = `<h3>#${esc(h.index)} ${esc(h.node)}${back ? ` <span class="lab">· return path</span>` : ""}</h3><p class="lead">${esc(h.summary)}</p><dl class="kv">${rows}</dl>`
     + (det ? `<b>Details</b><ul class="det">${det}</ul>` : "")
-    + `<b>Evidence</b> <span class="lab">· read-only requests nettrace sent and what came back</span>` + (ev || `<p class="empty" style="padding:6px 0">none recorded</p>`);
+    + `<b>Evidence</b> <span class="lab">· read-only requests Norn sent and what came back</span>` + (ev || `<p class="empty" style="padding:6px 0">none recorded</p>`);
   if (switchTab || S.tab === "hop") { if (S.tab !== "hop" && switchTab) setTab("hop"); else renderPane(); }
 }
-function showFinal(){ const t = S.entry.trace, n = S.nodes[S.entry.overlay.dest.node];
-  S.hopHtml = `<h3>${esc(t.Outcome)}</h3><p class="lead">${esc(t.Reason)}</p>` + (n ? `<p>Destination on the map: <b>${esc(n.label)}</b> (${esc(n.sub)})</p>` : "");
+// Return-path comparison for the inspector: status, flow and every detail line (values escaped)
+function symmetryHtml(t){
+  const r = t.Return; if (!r) return "";
+  const sy = r.Symmetry || {}, st = sy.status || "UNKNOWN", det = (sy.details || []).map(d => `<li>${esc(d)}</li>`).join("");
+  return `<h4 style="margin:12px 0 4px;font-size:13px">Return path comparison</h4><p class="lead"><span class="sym sym-${esc(st)}"><span aria-hidden="true">${esc(SYM_GLYPH[st] || "?")}</span> ${esc(st)}</span>`
+    + (r.Outcome ? ` · return ${esc(r.Outcome)}` : "") + `</p><p class="lab">Return flow: ${esc(flowText(r.Flow))}</p>` + (det ? `<ul class="det" aria-label="Comparison details">${det}</ul>` : "");
+}
+function showFinal(){ const t = S.entry.trace, back = dirOf(S.k) === "r", ov = back ? S.entry.return_overlay : S.entry.overlay, n = S.nodes[ov.dest.node];
+  S.hopHtml = `<h3>${esc(back ? "Return: " + t.Return.Outcome : t.Outcome)}</h3><p class="lead">${esc(back ? t.Return.Reason : t.Reason)}</p>` + (n ? `<p>${back ? "Source" : "Destination"} on the map: <b>${esc(n.label)}</b> (${esc(n.sub)})</p>` : "") + symmetryHtml(t);
   if (S.tab === "hop") renderPane(); }
 document.addEventListener("click", e => { const a = e.target.closest("a[data-node]"); if (a) { e.preventDefault(); selectNode(a.dataset.node); } });
 
@@ -780,7 +948,7 @@ function deviceFacts(n, dev){
   return f.filter(x => x[1]).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
 }
 function deviceHops(n){
-  if (!S.entry) return ""; const hn = S.entry.overlay.hop_nodes, here = S.entry.trace.Hops.filter(h => hn[String(h.index)] === n.id);
+  if (!S.entry) return ""; const hn = S.hn, here = allHops().filter(h => hn[String(h.index)] === n.id);
   return here.length ? `<b>Hops here in this trace</b><ul class="det">` + here.map(h => `<li><a href="#" data-step="${esc(h.index)}">${badge(h.status)}</a> ${esc(h.component)}: ${esc(h.summary)}</li>`).join("") + `</ul>` : "";
 }
 function consoleHtml(devName, dev, prompt, c){   // returns [scrolling top part, pinned bottom part]
@@ -820,26 +988,26 @@ function renderDevice(){
     <dl class="kv">${deviceFacts(n, dev)}</dl>${deviceHops(n)}`;
   if (dev) { const [top, bottom] = consoleHtml(devName, dev, prompt, S.console[devName] || (S.console[devName] = {lines: [], hist: [], hi: 0}));
     html = `<div class="devscroll">${html}${top}</div>${bottom}`; p.classList.add("devtab"); }
-  else if (n.kind !== "external") html += `<div class="note">${n.vpcs || n.ids ? "AWS components have no console: nettrace reads them with Describe/Search API calls during a trace. Each hop's evidence shows the exact calls." : "This node represents addresses, not a managed device."}</div>`;
+  else if (n.kind !== "external") html += `<div class="note">${n.vpcs || n.ids ? "AWS components have no console: Norn reads them with Describe/Search API calls during a trace. Each hop's evidence shows the exact calls." : "This node represents addresses, not a managed device."}</div>`;
   p.innerHTML = html;
   p.querySelectorAll("a[data-step]").forEach(a => a.onclick = e => { e.preventDefault(); const i = S.steps.findIndex(s => s.hop && s.hop.index == a.dataset.step); stop(); goto(i); setTab("hop"); });
   if (dev) { bindConsole(devName, dev, n, prompt); const d = p.querySelector(".devscroll"); if (d) d.scrollTop = keepTop; }
 }
 
 /* ===== L. left panel: scenarios + history ===== */
-const EXPECT_TEXT = {REACHABLE:"expect reachable", BLOCKED:"expect blocked", EXITED:"expect exit to unmanaged network", INCOMPLETE:"expect unverified (incomplete)"};
+const EXPECT_TEXT = {REACHABLE:"Expect reachable", BLOCKED:"Expect blocked", EXITED:"Expect exit to unmanaged network", INCOMPLETE:"Expect unverified (incomplete)"};
 function renderLeft(){
   const b = S.boot;
-  $("#mode").className = "mode " + b.mode; $("#mode").textContent = b.mode === "demo" ? "DEMO LAB · SIMULATED" : "LIVE · READ-ONLY";
+  $("#mode").className = "mode " + b.mode; $("#mode").textContent = b.mode === "demo" ? "Simulated lab" : "Live, read-only";
   $("#ver").textContent = "v" + b.version; $("#labtitle").textContent = b.mode === "demo" ? "About this lab" : "About this inventory";
   $("#labinfo").innerHTML = b.mode === "demo"
-    ? `<b>${esc(b.title)}</b><br>Simulated IOS-XE, PAN-OS + Panorama, Prisma Access and 3 AWS accounts. The real nettrace drivers, engine and read-only guards run unchanged; only the transports are simulated.`
+    ? `<b>${esc(b.title)}</b><br>Simulated IOS-XE, PAN-OS + Panorama, Prisma Access and 3 AWS accounts. The real Norn drivers, engine and read-only guards run unchanged; only the transports are simulated.`
     : `<b>${esc(b.title)}</b><br>Traces query your real devices and AWS accounts with read-only requests. Topology is generated from the inventory.`;
   const ps = b.presets || [];
   $("#presetsec").style.display = ps.length ? "" : "none";
-  $("#presets").innerHTML = ps.map(p => `<button type="button" class="preset ${esc(p.expect)}" data-id="${esc(p.id)}" aria-pressed="false" title="${esc(p.story)}"><div class="t">${esc(p.title)}</div>`
-    + `<div class="s">${esc(p.flow.src)} → ${esc(p.flow.dst)}:${esc(p.flow.port ?? "")}/${esc(p.flow.protocol)}</div>`
-    + `<div class="x"><span aria-hidden="true">${esc(OGLYPH[p.expect] || "?")}</span> ${esc(EXPECT_TEXT[p.expect] || "expect " + String(p.expect).toLowerCase())}</div></button>`).join("");
+  $("#presets").innerHTML = ps.map(p => `<button type="button" class="preset ${esc(p.expect)}" data-id="${esc(p.id)}" aria-pressed="false" title="${esc(p.story)}"><span class="g" aria-hidden="true">${esc(OGLYPH[p.expect] || "?")}</span><div class="t">${esc(p.title)}</div>`
+    + `<div class="s">${esc(p.flow.src)} → ${esc(p.flow.dst)}:${esc(p.flow.port ?? "")}/${esc(p.flow.protocol)}${p.flow.return ? " + return path" : ""}</div>`
+    + `<div class="x">${esc(EXPECT_TEXT[p.expect] || "Expect " + String(p.expect).toLowerCase())}</div></button>`).join("");
   $$("#presets .preset").forEach(el => el.onclick = () => { S.returnTo = el; runPreset(el.dataset.id); });
   syncPresetTab();
   const sel = $("#f-start"); Object.keys(b.devices).forEach(d => { const o = document.createElement("option"); o.value = d; o.textContent = d; sel.appendChild(o); });
@@ -879,8 +1047,8 @@ $("#replay").onclick = replay;
 $("#scrub").addEventListener("input", e => stepTo(+e.target.value, false));
 const rmSync = () => { stop(); $("#play").disabled = RM.matches; $("#play").title = RM.matches ? "Auto-play is off (reduced motion): use the step buttons" : "Play / pause (Space)"; };
 RM.addEventListener("change", rmSync); rmSync();
-$("#fit").onclick = fit; $("#focus").onclick = focusPath; $("#zin").onclick = () => zoomCentre(1.25); $("#zout").onclick = () => zoomCentre(0.8);
-addEventListener("resize", () => { S.entry ? focusPath() : fit(); refitPm(); });
+$("#fit").onclick = () => fit(); $("#focus").onclick = () => focusPath(); $("#zin").onclick = () => zoomCentre(1.25); $("#zout").onclick = () => zoomCentre(0.8);
+addEventListener("resize", () => { S.entry ? focusPath(false) : fit(false); refitPm(); });
 if (window.ResizeObserver) { const ro = new ResizeObserver(refitPm); ro.observe($("#pmview")); ro.observe($("#ipane")); }
 // Global shortcuts. Controls that own Space/Enter (buttons, links, rows, nodes, inputs) keep them.
 addEventListener("keydown", e => {
@@ -905,7 +1073,7 @@ function revealRow(row, mode){
   else if (top - pad < box.scrollTop) box.scrollTop = top - pad;
   else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight;
 }
-function fatal(msg){ document.body.innerHTML = `<div class="fatal" role="alert"><b>nettrace could not start.</b><p>${esc(msg)}</p></div>`; }
+function fatal(msg){ document.body.innerHTML = `<div class="fatal" role="alert"><b>Norn could not start.</b><p>${esc(msg)}</p></div>`; }
 async function startup(){
   try { S.boot = await api("/api/bootstrap"); } catch (e) { fatal(e.message); return; }
   S.topo = S.boot.topology; renderLeft(); renderTopology(); renderPane(); refreshHistory(); syncProto();

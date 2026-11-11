@@ -16,10 +16,11 @@ INVALID = "                ^\n% Invalid input detected at '^' marker.\n"
 # simulator does the same so a guard that only matches full words is exercised realistically.
 _KEYWORDS = [k.split() for k in (
     "show ip cef", "show ip route", "show ip interface brief", "show ip interface", "show ip arp",
-    "show ip access-lists", "show access-lists", "show version", "show running-config", "show startup-config",
+    "show ip access-lists", "show access-lists", "show ip nat statistics", "show ip nat translations",
+    "show zone security", "show ip inspect interfaces", "show version", "show running-config", "show startup-config",
     "show derived-config", "show tech-support", "show archive", "show logging", "show snmp user",
     "show crypto pki certificates", "show aaa servers", "show interfaces description", "show interface description",
-    "show vrf",
+    "show vrf", "show ip bgp", "show ip bgp summary", "show ip bgp vpnv4 vrf", "show ip static route",
 )]
 
 
@@ -61,12 +62,21 @@ class SimConnection:
             (r"show ip cef (?:vrf \S+ )?(\S+)", self._cef),
             (r"show ip route (?:vrf \S+ )?(\d+\.\d+\.\d+\.\d+)", self._route_one),
             (r"show ip route", lambda: self._route_table()),
+            (r"show ip bgp summary", lambda: self._bgp_summary()),
+            (r"show ip bgp vpnv4 vrf \S+ summary", lambda: self._bgp_summary()),
+            (r"show ip bgp vpnv4 vrf \S+ (\d+\.\d+\.\d+\.\d+)", self._bgp_one),
+            (r"show ip bgp (\d+\.\d+\.\d+\.\d+)", self._bgp_one),
+            (r"show ip static route(?: vrf \S+)?", lambda: self._static()),
             (r"show ip interface brief", lambda: self._brief()),
             (r"show ip interface (\S+)", self._interface),
             (r"show ip arp (?:vrf \S+ )?(\S+)", self._arp),
             (r"show ip arp", lambda: self._arp(None)),
             (r"show ip access-lists (\S+)", self._acl),
             (r"show (?:ip )?access-lists", lambda: "".join(self._acl(n) for n in self.dev["acls"])),
+            (r"show ip nat statistics", lambda: self._nat_statistics()),
+            (r"show zone security", lambda: self._zones()),
+            (r"show ip inspect interfaces", lambda: self._inspect()),
+            (r"show ip nat translations", lambda: "! simulated sensitive output (never reachable through the nettrace guard)\n"),
             (r"show version", lambda: self._version()),
             (r"show (?:running-config|startup-config|derived-config)", lambda: self._running()),
             (r"show (?:tech-support|archive|logging|snmp user|crypto pki certificates|aaa servers)",
@@ -156,6 +166,43 @@ class SimConnection:
                 lines.append(f"L        {own}/32 is directly connected, {name}")
         return "\n".join(lines) + "\n"
 
+    def _bgp_routes(self) -> list[tuple[str, str, str]]:
+        """(prefix, neighbor address, 'bgp <asn>') for routes the lab model says BGP learned."""
+        return [(p, nh, src) for p, nh, _n, src in self.dev["routes"] if src.startswith("bgp")]
+
+    def _bgp_one(self, ip: str) -> str:
+        """`show ip bgp <ip>`: the longest-match BGP entry, or the 'not in table' line."""
+        addr = ipaddress.ip_address(ip)
+        hits = [r for r in self._bgp_routes() if addr in ipaddress.ip_network(r[0])]
+        if not hits:
+            return "% Network not in table\n"
+        prefix, nh, src = max(hits, key=lambda r: ipaddress.ip_network(r[0]).prefixlen)
+        asn = src.split()[1]
+        return (f"BGP routing table entry for {prefix}, version 5\nPaths: (1 available, best #1, table default)\n"
+                f"  Refresh Epoch 1\n  {asn}\n    {nh} from {nh} ({nh})\n"
+                "      Origin IGP, metric 0, localpref 100, valid, external, best\n")
+
+    def _bgp_summary(self) -> str:
+        routes = self._bgp_routes()
+        if not routes:
+            return "% BGP not active\n"
+        neighbors: dict[str, tuple[str, int]] = {}
+        for _p, nh, src in routes:
+            asn, count = neighbors.get(nh, (src.split()[1], 0))
+            neighbors[nh] = (asn, count + 1)
+        out = [f"BGP router identifier {self.dev['mgmt']}, local AS number 65001",
+               "BGP table version is 12, main routing table version 12", "",
+               "Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd"]
+        for nh, (asn, count) in neighbors.items():
+            out.append(f"{nh:<15} 4 {asn:>9}    1234    1240       12    0    0 2d03h {count:>11}")
+        return "\n".join(out) + "\n"
+
+    def _static(self) -> str:
+        out = ["Codes in []: A - active, N - non-active, B - BFD-tracked, D - DHCP, X - Unresolved", "",
+               "Static local RIB for default", ""]
+        out += [f"M  {p}  [1/0] via {nh} [A]" for p, nh, _n, src in self.dev["routes"] if src == "static"]
+        return "\n".join(out) + "\n"
+
     def _brief(self) -> str:
         lines = ["Interface              IP-Address      OK? Method Status                Protocol"]
         for i in self.dev["interfaces"]:
@@ -185,6 +232,39 @@ class SimConnection:
         out.append(f"  Inbound  access list is {i['acl_in']}" if i.get("acl_in") else "  Inbound  access list is not set")
         out.append("  Proxy ARP is enabled")
         return "\n".join(out) + "\n"
+
+    def _nat_statistics(self) -> str:
+        """`show ip nat statistics`: totals, then the Outside/Inside interface lists (omitted when empty)."""
+        out = ["Total active translations: 0 (0 static, 0 dynamic; 0 extended)", "Peak translations: 0, occurred never"]
+        for role in ("outside", "inside"):
+            names = [i["name"] for i in self.dev["interfaces"] if i.get("nat") == role]
+            if names:
+                out += [f"{role.capitalize()} interfaces:", "  " + ", ".join(names)]
+        out += ["Hits: 0  Misses: 0", "CEF Translated packets: 0, CEF Punted packets: 0", "Expired translations: 0",
+                "Dynamic mappings:"]
+        return "\n".join(out) + "\n"
+
+    def _zones(self) -> str:
+        """`show zone security`: the system zone 'self', then every zone with its member interfaces."""
+        out = ["zone self", "  Description: System defined zone", ""]
+        zones: dict[str, list[str]] = {}
+        for i in self.dev["interfaces"]:
+            if i.get("zone"):
+                zones.setdefault(i["zone"], []).append(i["name"])
+        for zone, names in zones.items():
+            out += [f"zone {zone}", "  Description: simulated zone", "  Member Interfaces:"]
+            out += [f"    {n}" for n in names] + [""]
+        return "\n".join(out)
+
+    def _inspect(self) -> str:
+        """`show ip inspect interfaces` (classic CBAC): empty when no interface has an inspection rule."""
+        blocks = []
+        for i in self.dev["interfaces"]:
+            if i.get("inspect"):
+                blocks += [f" Interface {i['name']}", f"  Inbound inspection rule is {i['inspect']}",
+                           "  Outgoing inspection rule is not set", "  Inbound access list is not set",
+                           "  Outgoing access list is not set"]
+        return "Interface Configuration\n" + "\n".join(blocks) + "\n" if blocks else ""
 
     def _arp(self, ip: str | None) -> str:
         header = "Protocol  Address          Age (min)  Hardware Addr   Type   Interface"
@@ -227,6 +307,12 @@ class SimConnection:
                 out.append(f" ip access-group {i['acl_in']} in")
             if i.get("acl_out"):
                 out.append(f" ip access-group {i['acl_out']} out")
+            if i.get("nat"):
+                out.append(f" ip nat {i['nat']}")
+            if i.get("zone"):
+                out.append(f" zone-member security {i['zone']}")
+            if i.get("inspect"):
+                out.append(f" ip inspect {i['inspect']} in")
             out.append("!")
         for name, lines in d["acls"].items():
             out.append(f"ip access-list extended {name}")

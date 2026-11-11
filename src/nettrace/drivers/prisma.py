@@ -23,7 +23,7 @@ from nettrace.inventory import Inventory
 from nettrace.models import Evidence, Flow, Hop, Outcome, Status
 from nettrace.netutil import ip_in_range, longest_match, port_in_spec, protocol_number
 from nettrace.readonly import check_http_method
-from nettrace.steps import AwsAt, DeviceAt, PrismaAt, StepResult
+from nettrace.steps import AwsAt, DeviceAt, PrismaAt, StepResult, ipv6_unknown
 
 DEFAULT_API_URL = "https://api.strata.paloaltonetworks.com"
 DEFAULT_TOKEN_URL = "https://auth.apps.paloaltonetworks.com/am/oauth2/access_token"
@@ -307,6 +307,9 @@ def evaluate_rules(rules: list[dict[str, Any]], resolver: Resolver, flow: Flow, 
 def step(scm: ScmClient, inv: Inventory, at: PrismaAt, flow: Flow) -> StepResult:
     cfg = inv.prisma
     assert cfg is not None
+    v6 = ipv6_unknown(flow, "prisma", "prisma-access", "security policy")
+    if v6:
+        return v6
     start = len(scm.evidence)
     details: list[str] = []
     src_loc = inv.prisma_location(flow.src)

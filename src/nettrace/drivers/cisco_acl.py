@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from nettrace.drivers.ntc import ntc_parse
+from nettrace.errors import DeviceError
 from nettrace.models import Flow
 from nettrace.netutil import cisco_port, protocol_number, wildcard_match
 
@@ -119,6 +120,8 @@ def _entry_match(rec: dict[str, Any], flow: Flow) -> bool | None:
 
 
 def evaluate_acl(name: str, output: str, flow: Flow) -> AclResult:
+    if ":" in flow.src or ":" in flow.dst:  # wildcard masks and host matches here are IPv4 only; never guess
+        raise DeviceError(f"ACL {name}: IPv6 is not evaluated")
     records = [r for r in ntc_parse("show ip access-lists", output) if r.get("LINE_NUM")]
     raw_lines = {m.group(1): " ".join(m.group(0).split()) for m in _ACE_LINE.finditer(output)}
     if not raw_lines and not records:

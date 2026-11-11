@@ -27,9 +27,19 @@ _CISCO_ALLOWED = tuple(re.compile(p) for p in (
     rf"show ip route(?: vrf {_TOK})?(?: {_IPV4})?",
     rf"show ip cef(?: vrf {_TOK})? {_IPV4}",
     rf"show ip arp(?: vrf {_TOK})?(?: {_IPV4})?",
+    # Why-is-there-no-route evidence (drivers/cisco_routing.py): one host lookup or the neighbor summary, never the
+    # full BGP table, never `show ip bgp neighbors`. VRF forms use the vpnv4 table.
+    rf"show ip bgp {_IPV4}",
+    r"show ip bgp summary",
+    rf"show ip bgp vpnv4 vrf {_TOK} {_IPV4}",
+    rf"show ip bgp vpnv4 vrf {_TOK} summary",
+    rf"show ip static route(?: vrf {_TOK})?",
     r"show ip interface brief",
     rf"show ip interface {_TOK}",
     rf"show ip access-lists(?: {_TOK})?",
+    r"show ip nat statistics",  # interface roles only (Inside/Outside interfaces); never `show ip nat translations`
+    r"show zone security",
+    r"show ip inspect interfaces",
     r"show interfaces description",
     r"show version",
     r"show vrf",

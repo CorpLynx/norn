@@ -245,7 +245,7 @@ def test_scenario_cards_group_with_arrow_keys_and_clear_states():
         assert key in nav, key
     assert "e.stopPropagation()" in nav   # arrows on a card never step the trace
     assert "p.tabIndex = p === on ? 0 : -1" in APP_HTML and 'aria-pressed' in APP_HTML
-    assert '.preset.on::after{content:"SELECTED"' in APP_HTML and ".preset .x{display:inline-block" in APP_HTML
+    assert '.preset.on::after{content:"Selected"' in APP_HTML and ".preset .x{display:inline-block" in APP_HTML
 
 
 def test_sim_bar_stays_on_one_row_and_step_label_ellipsises():

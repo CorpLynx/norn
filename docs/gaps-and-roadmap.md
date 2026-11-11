@@ -27,6 +27,9 @@ code that would change if the assumption is wrong.
 | V14 | `show devicegroups` → `devicegroups/entry[@name]/devices/entry[@name=serial]` and `show dg-hierarchy` → nested `<dg name>` (pan-os-python) | `PanoramaClient.devices`, `dg_parents` | `nettrace panorama show-device --device X` |
 | V15 | Panorama-pushed rules are visible on the firewall under `/config/panorama/vsys/...` with `action=show`. If not, the Panorama DG-chain fallback still finds them | `PanosClient._lookup` | `panos test-nat-policy` on a NAT rule defined in a parent device group, with `--verbose` |
 | V16 | Firewall interface IPs from `show interface all` through Panorama are enough for `inventory discover` to map next hops | `discover_addresses` | `nettrace inventory discover` then `inventory resolve --ip <fw interface>` |
+| V17 | IOS-XE `show ip static route [vrf X]` exists on the owner's images and prints `prefix [AD/metric] via nh [flag]` with `[A]` active / `[N]` non-active. Format from memory, not captured | `drivers/cisco_routing.py` `parse_static_routes` | run on a router with an unreachable static; look at `--verbose` evidence. Without a flag the parser says "install state unknown" |
+| V18 | `show ip bgp <ip>` prints `BGP routing table entry for ..., version` and `Paths: (N available, best #N / no best path)`; VRFs use `show ip bgp vpnv4 vrf X <ip>` and `... summary`; the ntc `cisco_ios_show_ip_bgp_summary` template reads the neighbor table in both | `parse_bgp_prefix`, `parse_bgp_summary` | capture real output for: not in table, best path, inaccessible next hop, neighbors Idle/Active/Admin down, in the global table and a VRF (the CML lab can do this) |
+| V19 | PAN-OS: the static-route config sits at `.../network/virtual-router/entry[@name=X]/routing-table/ip/static-route` (legacy) or `.../logical-router/entry[@name=X]/vrf/entry[@name='default']/routing-table/ip/static-route` (advanced); `<show><routing><protocol><bgp><peer/>` (legacy) and `<show><advanced-routing><bgp><peer><status/>` return entries with a `status` and a peer name or address | `drivers/panos_routing.py` | run both on a firewall with a down BGP peer and an unreachable static route; check the evidence. Anything else is reported as "not interpreted" |
 
 ## 2. Functional gaps
 
@@ -62,8 +65,13 @@ code that would change if the assumption is wrong.
 - **G10.** Prisma Access source NAT on egress and explicit-proxy flows aren't modelled.
 
 ### Cisco
-- **G11.** Not evaluated: zone-based firewall, PBR / route-maps, NAT, VRF-leaking edge cases,
-  object-group contents (`show object-group` could resolve these), and IPv6.
+- **G11.** Not evaluated: zone-based firewall, PBR / route-maps, NAT, VRF-leaking edge cases and
+  object-group contents (`show object-group` could resolve these). **Now detected, not silent:** NAT
+  (`show ip nat statistics`), zone-based firewall (`show zone security`) and `ip inspect`
+  (`show ip inspect interfaces`) on the flow's ingress or egress interface make the router hop UNKNOWN (so the
+  trace ends INCOMPLETE, exit 4) with a detail line naming the feature and interface; PBR is WARN (UNKNOWN when
+  it could rescue a no-route); object-group ACL entries are `uncertain` (hop WARN, a deny behind one UNKNOWN).
+  Still open: evaluating any of them (see D15). Real IOS-XE wording of the three new commands is from memory.
 - **G12.** ECMP follows the first CEF path only (with a warning). Not modelled: CEF hash, NX-OS/ASA
   (out of scope, "mostly XE").
 
@@ -73,13 +81,17 @@ code that would change if the assumption is wrong.
   Route 53 Resolver, PrivateLink services, ELB/NLB targets.
 - **G14.** ECMP across TGW attachments follows the first attachment. Appliance-mode symmetry isn't
   checked.
-- **G15.** Return path is checked only for NACL ports. A full reverse trace (dst -> src) is not run, so
-  asymmetric routing through a stateful firewall isn't detected.
+- **G15.** *Partly closed (2026-11-11).* `trace run --return` (also a UI checkbox and `"return": true`) runs a
+  reverse trace after a REACHABLE forward trace and compares devices, interfaces, zones and HA members (see D16).
+  Still open: no session-table check (so a stateful deny on the return flow is reported INCOMPLETE, not as a block,
+  and the trace does not continue past it); no NAT of the return flow beyond what the drivers report; no ECMP
+  all-paths; a hairpinned or appliance-mode design is compared by devices touched, not by direction; the offline
+  path map (`viz/`) still shows the forward path only; nothing verified on real devices.
 - **G16.** ENI search is O(accounts × regions × 2) calls. It could be slow with many accounts, and
   there is no persistent cache.
 
 ### General
-- **G17.** A pytest suite exists (`tests/`, 446 tests: demo presets, read-only guards, hardening,
+- **G17.** A pytest suite exists (`tests/`, 540 tests: demo presets, read-only guards, hardening,
   audit/console scope, never-guess and robustness cases, ACL and netutil units, packet-flow and
   artifact checks), but there is no CI, and nothing verifies against real devices. The suite
   uses the demo simulators, so it proves self-consistency, not device behaviour. Still missing:
@@ -93,7 +105,10 @@ code that would change if the assumption is wrong.
 - **G19.** A trace has an overall deadline (`trace_timeout` / `--timeout`, default 120 s), AWS clients
   use short timeouts with standard retries, and PAN-OS/SCM reads retry once on a timeout. Cisco SSH
   commands are not retried, so a slow device fails the hop (`INCOMPLETE`).
-- **G20.** IPv4-centric throughout.
+- **G20.** IPv4-centric throughout. **Now guarded, not silent:** a flow with an IPv6 source or destination makes the
+  Cisco, PAN-OS, AWS and Prisma entry points return one UNKNOWN hop ("IPv6 is not evaluated") and the trace ends
+  INCOMPLETE; no IPv4 logic or command runs on it (`steps.ipv6_unknown`). The ACL evaluator also refuses IPv6.
+  IPv6 is still not evaluated anywhere.
 
 ## 3. Proposed next iterations
 
@@ -144,9 +159,7 @@ single-component commands stay fast.
   locks in V3, V4 and V8.
 
 ### R4. Reverse-path trace (high value for stateful firewalls, medium effort). Fixes G15
-- `trace run --both-directions`: after a forward REACHABLE, trace (final dst -> src) with the
-  post-NAT flow. Flag it if the reverse path crosses a different stateful firewall than the forward
-  path (asymmetric routing).
+- Done as `trace run --return` (G15, D16). Remaining: session-table check, ECMP, return map in `viz/`.
 
 ### R5. Cisco object-groups and PBR (medium value, low to medium effort). Fixes part of G11
 - Resolve `object-group` ACL entries via `show object-group name X`.

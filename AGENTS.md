@@ -8,6 +8,8 @@ and where to look next. Detail lives in `docs/`:
 | `docs/architecture.md` | changing the engine, adding a driver, or debugging a trace |
 | `docs/gaps-and-roadmap.md` | picking up the next piece of work, or judging whether a result can be trusted |
 | `docs/decisions.md` | wondering why something is built the way it is (and before reversing it) |
+| `docs/discovery-spec.md` | building the topology crawler (`nettrace topology ...`); rationale is in `docs/topology-discovery-design.md` |
+| `docs/design-guide.md` | changing the web UI: colour, type, layout, components, motion (the UI is branded "Norn") |
 | `README.md` | user-facing install, configuration and command reference |
 
 ## Intent
@@ -65,7 +67,11 @@ and `--query` (JMESPath) accepted anywhere on the line.
    groups, object-groups, FQDN objects, URL categories), report it as uncertain (`UNKNOWN`/`WARN`, or an
    `uncertain` list). Never assume it matched or didn't match. A query the device failed to answer
    (`panos.Unavailable`) is not "not configured". A deny or an allow below an uncertain Prisma rule is UNKNOWN (a rule with a `schedule` is uncertain). A Cisco ingress inferred from the route back is WARN. Cisco ECMP
-   and policy routing are WARN (alternatives listed), never a silent pick. Several ENIs with one IP raise
+   and policy routing are WARN (alternatives listed), never a silent pick. A hop with no route adds BGP and static-route evidence
+   (`drivers/cisco_routing.py`, `drivers/panos_routing.py`, D17): it never turns a BLOCK into a PASS, unreadable output is "not
+   interpreted" (never "no routes"), and if that evidence shows a usable route while the lookup found none the hop is UNKNOWN. NAT, a zone-based firewall or `ip inspect` on a Cisco hop's ingress or egress
+   interface makes that hop UNKNOWN (detail line names the feature and interface; nettrace evaluates none of them). An IPv6 source or destination is
+   UNKNOWN "IPv6 is not evaluated" at every driver entry point (`steps.ipv6_unknown`) before any command is sent. Several ENIs with one IP raise
    `AmbiguousEni`. A trace has an overall deadline (`errors.Deadline`, default 120 s, `trace_timeout` /
    `--timeout`); every new request path must call `deadline.check()` before it sends (it also raises `Cancelled`
    when the user cancels from the web UI or Ctrl-C; that ends INCOMPLETE "cancelled by user" with the hops so far). A trace with any UNKNOWN hop never ends
@@ -113,7 +119,7 @@ and `--query` (JMESPath) accepted anywhere on the line.
 ## Status (as of 2026-11-08)
 
 - v0.4.0. It works end to end in simulation: a custom EC2 simulator for AWS (`demo/sim_aws.py`), canned Cisco, PAN-OS, Panorama and SCM
-  answers. The demo lab's 12 presets all give their expected outcome (`tests/test_demo_presets.py`).
+  answers. The demo lab's 17 presets (12 original + `guest-nat`, `ipv6-not-evaluated` + the 3 `return-*` scenarios) all give their expected outcome (`tests/test_demo_presets.py`).
 - Path maps: `trace run --map x.html|x.svg` / `--open` and `nettrace viz render` draw a NetBrain-style
   map from the trace JSON (`src/nettrace/viz/`). The HTML is a single offline file.
 - Demo lab plus web UI:
@@ -127,15 +133,16 @@ and `--query` (JMESPath) accepted anywhere on the line.
 - It is not yet known whether Prisma Access is managed by **Panorama** (device groups such as
   `Mobile_User_Device_Group`) or by **Strata Cloud Manager**. The code assumes SCM. This is roadmap
   item R2.
-- Test suite: `.venv/bin/pytest -q` (~446 tests: guards, hardening, audit/console scope, never-guess and robustness cases,
-  ACL and netutil units, and all 12 demo presets). It uses the demo lab's simulators as the harness.
+- Test suite: `.venv/bin/pytest -q` (~734 tests: guards, hardening, audit/console scope, never-guess and robustness cases,
+  ACL and netutil units, and all 17 demo presets). It uses the demo lab's simulators as the harness.
 
 ## Code map
 
 ```
 src/nettrace/
   cli.py            click commands; AWS-style global-option hoisting; exit codes
-  engine.py         Tracer: locate source -> loop {driver step -> resolve next position}
+  engine.py         Tracer: locate source -> loop {driver step -> resolve next position}; trace_with_return (G15)
+  symmetry.py       reverse flow + forward/return comparison (structured fields only)
   steps.py          Position types (DeviceAt, AwsAt, PrismaAt), Egress, StepResult
   models.py         Flow, Hop, Evidence, Status, Outcome, TraceResult (+ to_dict for JSON)
   inventory.py      YAML loader/validator, IP->device lookups, links, discovery cache
@@ -160,6 +167,8 @@ src/nettrace/
   drivers/
     cisco_iosxe.py  Netmiko client + per-hop evaluation (CEF, route, ACLs, ARP)
     cisco_acl.py    first-match ACL evaluator on ntc-templates output
+    cisco_routing.py  why-no-route evidence for a Cisco hop: BGP table and neighbors, static routes (read-only)
+    panos_routing.py  same for PAN-OS: static-route config and BGP peers
     ntc.py          ntc-templates wrapper
     panos.py        XmlApi transport; PanosClient (direct or Panorama target=); PanoramaClient (devices,
                     HA, device groups, dg-hierarchy); make_client(); per-hop evaluation (zones, FIB,
@@ -197,3 +206,11 @@ python3 -m venv .venv && .venv/bin/pip install -e .
 - Exit codes for `trace run`: 0 reachable or exited the known network (REACHABLE/EXITED, only with no UNKNOWN hops), 3 blocked,
   4 incomplete (the engine downgrades REACHABLE/EXITED with any UNKNOWN hop to INCOMPLETE; Ctrl-C/cancel also gives 4), 1 error, 2 usage error.
   `--output text` is kept: the README documents it (`--output text | grep ^HOP`).
+- Return path (`trace run --return`, UI checkbox, `"return": true`): OFF by default (it doubles the read-only queries).
+  Forward BLOCKED/INCOMPLETE/EXITED skips it (Symmetry NOT_RUN). With a delivered forward path: return BLOCKED by a
+  stateless hop -> exit 3, return INCOMPLETE or symmetry UNKNOWN -> 4, ASYMMETRIC -> 0 with a warning. A deny by a
+  stateful hop (PAN-OS, Prisma, SG) on the return flow is INCOMPLETE, not BLOCKED: nettrace evaluates the return flow as a
+  new session and does not read session tables. UNKNOWN in either direction makes the symmetry UNKNOWN. The comparison
+  reads structured hop fields only (see `symmetry.py`); never parse summary text. Return hops are numbered after the
+  forward hops. Audit records written during a `--return` trace carry `direction`: `forward` / `return`. The offline
+  path map (`viz/`) is forward-only.

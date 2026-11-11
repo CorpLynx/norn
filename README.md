@@ -44,7 +44,7 @@ hop list and inspector show the evidence behind each verdict.
 ![nettrace web UI: a blocked trace](docs/demo-ui.png)
 
 Every trace plays as a packet flow along the path: streams of packets leave the source and move hop by hop to the
-destination, coloured by the status of the hop they leave (green pass, amber warn or unknown, red block). A
+destination, coloured by the status of the hop they leave (green pass, amber warn, violet unknown, red block). A
 blocked flow stops at the device that denied it, which is marked "blocked here". Below, the "DC user → prod web" scenario at 2x
 speed, with the hop list following along:
 
@@ -85,7 +85,7 @@ so any source and destination you type gets a real answer, not just the presets.
 - **Device console.** Runs read-only commands on the device (simulated in the demo, real in live
   mode). The "try a write ✋" chip shows the read-only guard refusing `configure terminal` or a PAN-OS
   `<request>`.
-- **Scenarios and history.** 12 preset scenarios with an expected outcome each (see
+- **Scenarios and history.** 17 preset scenarios (3 of them trace the return path) with an expected outcome each (see
   `nettrace demo scenarios`), plus a history of recent traces.
 - **Deep links.** `#preset=branch-smb&step=last&node=core-rtr1` opens a scenario at a given step
   with a node selected; `#trace=<id>` reopens a trace from history. These work after
@@ -235,7 +235,7 @@ credentials should be read-only too:
   `get`/`show`, to read rule actions, NAT translations and address objects). Check in your
   environment that the role permits the `test ...-policy-match` commands.
 - **Cisco**: a user restricted to `show` commands (TACACS+ command authorization or a privilege level
-  that includes `show ip route`, `show ip cef`, `show ip interface`, `show ip arp`, `show ip access-lists`).
+  that includes `show ip route`, `show ip cef`, `show ip interface`, `show ip arp`, `show ip access-lists`, `show ip nat statistics`, `show zone security`, `show ip inspect interfaces`). When a router has no route, nettrace also asks `show ip bgp <dst>`, `show ip bgp summary` and `show ip static route` (the `vpnv4 vrf` forms for a VRF) to explain why; a role without them still works, those lines just say they could not be read.
 - **Strata Cloud Manager**: a service account with a view-only role.
 
 ## Usage
@@ -279,9 +279,18 @@ nettrace inventory resolve --ip 10.20.1.50 --aws
 nettrace inventory discover
 
 # path maps
+nettrace trace run -s 10.1.1.10 -d 10.20.1.50 -p 443 --return
 nettrace trace run -s 10.1.1.10 -d 10.20.1.50 -p 443 --map trace.html --open
 nettrace viz render --input trace.json --out-file trace.svg
 ```
+
+Return path: add `--return` to also trace the way back (destination to source) and compare the two paths. It is off
+by default because it doubles the read-only queries. The result gets a `Return` section with a `Symmetry` verdict
+(`SYMMETRIC`, `ASYMMETRIC`, `UNKNOWN`, `NOT_RUN`); in the web UI tick **Include return path**. A delivered forward
+path whose reply is blocked by a stateless hop (NACL, route) exits `3`; an unverified return exits `4`; an asymmetric
+path exits `0` with a warning naming the stateful device that sees one direction only. nettrace does not read firewall
+session tables, so a deny by a stateful firewall on the return flow is reported as unverified, not as blocked.
+The `--map` file shows the forward path only.
 
 Exit codes for `trace run`: `0` reachable or left the known network (internet / unmanaged next hop),
 `3` blocked, `4` incomplete (something couldn't be evaluated, including a reachable or exited path

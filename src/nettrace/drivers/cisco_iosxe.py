@@ -11,12 +11,13 @@ from typing import Any
 from nettrace import audit
 from nettrace.credentials import env_value
 from nettrace.drivers.cisco_acl import AclResult, evaluate_acl
+from nettrace.drivers.cisco_routing import explain_missing_route, floating_static_note
 from nettrace.drivers.ntc import ntc_parse
 from nettrace.errors import Deadline, DeviceError, ReadOnlyViolation
 from nettrace.inventory import Device
 from nettrace.models import Evidence, Flow, Hop, Outcome, Status, truncate
 from nettrace.readonly import check_cisco_command, safe_token
-from nettrace.steps import DeviceAt, Egress, StepResult
+from nettrace.steps import DeviceAt, Egress, StepResult, ipv6_unknown
 
 
 # ---- parsers for specific-lookup commands (no ntc template exists) ---------------
@@ -60,8 +61,11 @@ def parse_cef(output: str) -> CefResult:
 def parse_route_source(output: str) -> tuple[str | None, str | None]:
     """'show ip route <ip>' -> (prefix, 'bgp 65001' / 'connected' / ...)."""
     prefix = re.search(r"Routing entry for (\S+)", output)
-    known = re.search(r'Known via "([^"]+)"', output)
-    return (prefix.group(1) if prefix else None, known.group(1) if known else None)
+    known = re.search(r'Known via "([^"]+)"(?:, distance (\d+))?', output)
+    source = known.group(1) if known else None
+    if source and source.startswith("static") and known.group(2) and known.group(2) != "1":
+        source = f"{source} (distance {known.group(2)})"  # a floating static; the default distance adds nothing
+    return (prefix.group(1) if prefix else None, source)
 
 
 # ---- client ----------------------------------------------------------------------
@@ -154,7 +158,9 @@ class CiscoClient:
                 raise
             audit.log("ssh", self.device.name, command, "ok")
             if re.search(r"^% (?!Network not in table)|--More--", out, re.M):  # any IOS error line
-                raise DeviceError(f"{self.device.name}: '{command}' rejected: {out.strip().splitlines()[0]}")
+                err = re.search(r"^% .*", out, re.M)  # the error line itself, not the caret line above it
+                raise DeviceError(f"{self.device.name}: '{command}' rejected: "
+                                  f"{err.group(0) if err else out.strip().splitlines()[0]}")
             self._cache[command] = out
             self.evidence.append(Evidence(self.device.name, command, truncate(out.strip(), EVIDENCE_CHARS)))
         return self._cache[command]
@@ -199,6 +205,84 @@ class CiscoClient:
         m = re.search(r"^\s*Policy routing is enabled(?:, using route-map\s+(\S+))?", out, re.M | re.I)
         return (m.group(1) or "(unnamed)") if m else None
 
+    def _probe(self, command: str) -> str:
+        """Output of a feature-detection command, or "" when this image does not have the command at all
+        ("% Invalid input"/"% Incomplete command": a router without the feature). Any other failure raises:
+        a query the device failed to answer is not "feature not configured"."""
+        try:
+            return self.show(command)
+        except DeviceError as exc:
+            if re.search(r"Invalid input|Incomplete command|Unrecognized command", str(exc)):
+                return ""
+            raise
+
+    def nat_interfaces(self) -> dict[str, str]:
+        """{interface (lower case): 'inside'|'outside'} from `show ip nat statistics`
+        ("Outside interfaces:" / "Inside interfaces:" lists). Output without the statistics header raises."""
+        out = self._probe("show ip nat statistics")
+        if not out.strip():
+            return {}
+        if "Total active translations" not in out:
+            raise DeviceError(f"{self.device.name}: could not parse 'show ip nat statistics' output")
+        roles: dict[str, str] = {}
+        side: str | None = None
+        for line in out.splitlines():
+            m = re.match(r"(Inside|Outside) interfaces:(.*)$", line, re.I)  # headers are not indented
+            if m:
+                side, rest = m.group(1).lower(), m.group(2)
+            elif side and line[:1].isspace() and line.strip():
+                rest = line
+            else:
+                side, rest = None, ""
+            if side:
+                for name in rest.split(","):
+                    if name.strip():
+                        roles[name.strip().lower()] = side
+        return roles
+
+    def zone_members(self) -> dict[str, str]:
+        """{interface (lower case): zone} from `show zone security`. Empty output = no zones configured."""
+        out = self._probe("show zone security")
+        if not out.strip():
+            return {}
+        if not re.search(r"^zone\s+\S+", out, re.M):
+            raise DeviceError(f"{self.device.name}: could not parse 'show zone security' output")
+        members: dict[str, str] = {}
+        zone: str | None = None
+        in_members = False
+        for line in out.splitlines():
+            z = re.match(r"^zone\s+(\S+)", line)
+            if z:
+                zone, in_members = z.group(1), False
+            elif re.match(r"^\s+Member Interfaces:", line):
+                in_members = True
+            elif in_members and zone and line[:1].isspace() and line.strip():
+                for name in line.split(","):
+                    if name.strip():
+                        members[name.strip().lower()] = zone
+            elif line.strip():
+                in_members = False
+        return members
+
+    def inspect_rules(self) -> dict[str, list[tuple[str, str]]]:
+        """{interface (lower case): [(direction, rule)]} from `show ip inspect interfaces` (classic CBAC)."""
+        out = self._probe("show ip inspect interfaces")
+        if not out.strip():
+            return {}
+        if not re.search(r"^\s*Interface\b", out, re.M):
+            raise DeviceError(f"{self.device.name}: could not parse 'show ip inspect interfaces' output")
+        rules: dict[str, list[tuple[str, str]]] = {}
+        intf: str | None = None
+        for line in out.splitlines():
+            m = re.match(r"^\s*Interface\s+(\S+)\s*$", line)
+            if m:
+                intf = m.group(1).lower()
+                continue
+            r = re.match(r"^\s*(Inbound|Outgoing) inspection rule is (\S+)", line, re.I)
+            if r and intf and r.group(2).lower() != "not":
+                rules.setdefault(intf, []).append((r.group(1).lower(), r.group(2)))
+        return rules
+
     def interface_for_ip(self, ip: str) -> str | None:
         for row in self.interfaces_brief():
             if row.get("IP_ADDRESS") == ip:
@@ -221,9 +305,36 @@ def _acl_name(value: str | None) -> str | None:
     return value.strip()
 
 
+def unevaluated_features(client: CiscoClient, ingress: str | None, egress: str | None) -> list[str]:
+    """Detail lines for features on the flow's ingress/egress interface that nettrace does NOT evaluate and that
+    can change the verdict: NAT (rewrites src/dst, so the ACLs and routes evaluated here may not see the real
+    addresses), zone-based firewall and classic ip inspect (can drop the flow). Not per-router: a feature on
+    another interface cannot touch this flow. A failed query raises (UNKNOWN hop), never "not configured"."""
+    lines: list[str] = []
+    sides = [(n, d) for n, d in ((ingress, "ingress"), (egress, "egress")) if n]
+    nat = client.nat_interfaces()
+    zones = client.zone_members()
+    inspect = client.inspect_rules()
+    for name, role in sides:
+        key = name.lower()
+        if key in nat:
+            lines.append(f"NAT configured on {name} ({nat[key]}): nettrace does not evaluate NAT, "
+                         f"the real addresses may differ ({role} interface)")
+        if key in zones:
+            lines.append(f"zone-based firewall: {name} is in security zone {zones[key]}: nettrace does not evaluate "
+                         f"zone-pair policy, the flow may be dropped ({role} interface)")
+        for direction, rule in inspect.get(key, []):
+            lines.append(f"ip inspect rule {rule} ({direction}) is applied on {name}: nettrace does not evaluate "
+                         f"inspection, the flow may be dropped ({role} interface)")
+    return lines
+
+
 # ---- hop evaluation ---------------------------------------------------------------
 def step(client: CiscoClient, at: DeviceAt, flow: Flow) -> StepResult:
     dev = client.device
+    v6 = ipv6_unknown(flow, "cisco", dev.name, "router")  # before any command: the IPv4 allowlist/logic cannot answer
+    if v6:
+        return v6
     start_evidence = len(client.evidence)
     details: list[str] = []
     warnings: list[str] = []
@@ -285,16 +396,32 @@ def step(client: CiscoClient, at: DeviceAt, flow: Flow) -> StepResult:
     if vrf:
         route_txt = f"vrf {vrf}: {route_txt}"
 
+    floating = floating_static_note(source)
+    if floating:
+        details.append(floating)
+
     if not cef.entries:
+        # Say why (BGP table and neighbors, static routes). Evidence only: it cannot turn this into a PASS, but if
+        # BGP or the static table shows a usable route while CEF has none, the sources disagree: UNKNOWN.
+        diag = explain_missing_route(client, flow.dst, vrf)
+        details.extend(diag.lines)
+        why = f" ({diag.reason})" if diag.reason else ""
+        if diag.contradiction:
+            return StepResult([hop(Status.UNKNOWN, f"no forwarding entry for {flow.dst} ({route_txt}), but routing "
+                                   "evidence shows a route; sources disagree", ingress=ingress)], flow,
+                              outcome=Outcome.INCOMPLETE, reason=f"{dev.name}: no forwarding entry for {flow.dst}{why}")
         return StepResult([hop(deny[0], f"no route to {flow.dst} ({route_txt})", ingress=ingress)], flow,
-                          outcome=deny[1], reason=f"{dev.name}: no route to {flow.dst}")
+                          outcome=deny[1], reason=f"{dev.name}: no route to {flow.dst}{why}")
     first = cef.entries[0]
     if first.kind == "drop":
         return StepResult([hop(deny[0], f"route {route_txt} drops traffic (Null0/discard)", ingress=ingress)],
                           flow, outcome=deny[1], reason=f"{dev.name}: route to {flow.dst} is a discard route")
     if first.kind == "receive":
-        return StepResult([hop(Status.WARN if pbr else Status.PASS, f"{flow.dst} is an address on this router",
-                               ingress=ingress)], flow,
+        feats = unevaluated_features(client, ingress, None)
+        details.extend(feats)
+        warnings.extend(f"{dev.name}: {f}" for f in feats)
+        return StepResult([hop(Status.UNKNOWN if feats else Status.WARN if pbr else Status.PASS,
+                               f"{flow.dst} is an address on this router", ingress=ingress)], flow,
                           outcome=Outcome.REACHABLE, reason=f"destination is {dev.name} itself")
     ecmp = [e for e in cef.entries if e.kind == "nexthop"]
     if len(ecmp) > 1:
@@ -318,11 +445,19 @@ def step(client: CiscoClient, at: DeviceAt, flow: Flow) -> StepResult:
 
     policy = "; ".join(f"{r.name} {d}: {r.line}" for d, r in acl_results) or "no interface ACLs"
     status = Status.WARN if pbr or len(ecmp) > 1 or inferred else Status.PASS
+    # NAT / zone firewall / ip inspect on the ingress or egress interface: UNKNOWN, not WARN. WARN means "forwards,
+    # but check"; here the verdict itself may be wrong (NAT rewrites the addresses the ACLs and routes were
+    # evaluated against; a zone policy can drop a flow nettrace passed). UNKNOWN also downgrades REACHABLE/EXITED.
+    feats = unevaluated_features(client, ingress, egress)
+    if feats:
+        status = Status.UNKNOWN
+        details.extend(feats)
+        warnings.extend(f"{dev.name}: {f}" for f in feats)
     for d, r in acl_results:
         if not r.exists:
             details.append(f"ACL {r.name} ({d}) is referenced but not defined; IOS permits all")
         if r.uncertain:
-            status = Status.WARN
+            status = Status.UNKNOWN if status == Status.UNKNOWN else Status.WARN
             details.append(f"ACL {r.name} ({d}): could not evaluate entries {', '.join(r.uncertain)}")
 
     if first.kind == "attached":
@@ -331,7 +466,7 @@ def step(client: CiscoClient, at: DeviceAt, flow: Flow) -> StepResult:
             details.append(f"ARP {flow.dst} -> {arp.get('MAC_ADDRESS')} on {arp.get('INTERFACE') or egress}")
         else:
             details.append(f"no ARP entry for {flow.dst} on {egress}")
-            status = Status.WARN if status == Status.PASS else status
+            status = Status.WARN if status == Status.PASS else status  # UNKNOWN stays UNKNOWN
             warnings.append(f"{dev.name}: {flow.dst} is on a connected subnet but has no ARP entry")
         summary = f"{route_txt} connected via {egress}"
     else:
