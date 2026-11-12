@@ -16,6 +16,8 @@ from typing import Any
 
 import yaml
 
+from nettrace.discovery.model import Provenance, normalise_interface
+from nettrace.discovery.policy import TopologyPolicy, parse_topology
 from nettrace.errors import InventoryError
 from nettrace.netutil import longest_match
 
@@ -149,6 +151,16 @@ class Link:
     name: str
     a: LinkEnd
     b: LinkEnd
+    # Learned-link fields (docs/discovery-spec.md 7.2). The defaults are what a YAML link has always meant.
+    origin: str = "declared"  # declared | learned | inferred
+    kind: str = "unknown"     # ipsec | gre | aws-vpn | prisma | unknown
+    oper: str = "unknown"     # up | down | unknown
+    id: str = ""
+    provenance: tuple[Provenance, ...] = ()
+    first_seen: float = 0.0
+    last_confirmed: float = 0.0
+    absent_since: float | None = None
+    conflicts: tuple[str, ...] = ()
 
 
 @dataclass
@@ -187,6 +199,7 @@ class Inventory:
     discovered: dict[str, dict[str, str]] = field(default_factory=dict)
     ambiguous: dict[str, list[dict[str, str]]] = field(default_factory=dict)  # ip -> every claim (device, interface)
     trace_timeout: float = DEFAULT_TRACE_TIMEOUT  # overall seconds per trace; --timeout overrides
+    topology: TopologyPolicy | None = None  # the optional `topology:` section; None = declared links only
 
     # ---- lookups -------------------------------------------------------------
     def device(self, name: str) -> Device:
@@ -236,11 +249,14 @@ class Inventory:
         return None
 
     def link_from_device(self, device: str, interface: str | None, next_hop: str | None) -> tuple[Link, LinkEnd] | None:
+        dev = self.devices.get(device)
+        platform = dev.platform if dev else None
+        want = normalise_interface(interface, platform).lower() if interface else None
         for link in self.links:
             for here, there in ((link.a, link.b), (link.b, link.a)):
                 if here.device != device:
                     continue
-                if here.interface and interface and here.interface.lower() == interface.lower():
+                if here.interface and want and normalise_interface(here.interface, platform).lower() == want:
                     return link, there
                 if here.next_hop and next_hop and here.next_hop == next_hop:
                     return link, there
@@ -652,7 +668,7 @@ def load_inventory(path: Path | str | None = None) -> Inventory:
         raise InventoryError("trace_timeout must be a number of seconds between 1 and 3600")
 
     inv = Inventory(path=path, devices=devices, networks=networks, aws_accounts=accounts, links=links, prisma=prisma,
-                    panorama=panorama, trace_timeout=float(timeout))
+                    panorama=panorama, trace_timeout=float(timeout), topology=parse_topology(raw.get("topology")))
     cache = inv.cache_file()
     if cache.exists():
         raw = _read_json(cache)

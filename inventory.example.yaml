@@ -137,3 +137,19 @@ links:
   - name: dc1-internet                   # traces leaving here end as EXITED "to Internet (ISP-A)"
     a: {device: fw-dc1, interface: ethernet1/4}
     b: {external: "Internet (ISP-A)"}
+
+# Learned links (docs/discovery-spec.md, D18). Optional; without this section nothing changes.
+# The crawler (`nettrace topology crawl`) is not built yet: only the section is parsed today.
+# topology:
+#   use_learned: true          # traces may use learned links; `trace run --no-learned` opts out
+#   ttl_fresh: 3600            # seconds: a learned link younger than this is used without comment
+#   ttl_max: 86400             # older than this: treated as inferred (never forwards a trace)
+#   crawl:
+#     timeout: 600
+#     max_devices: 200
+#     device_sessions: 4       # concurrent devices
+#     command_gap: 1.0         # seconds between commands to one device
+#     device_budget: {seconds: 60, commands: 40}
+#     row_cap: 2000            # rows kept per command; more is a DeviceError
+#     aws_concurrency: 8
+#     cooldown: 900            # seconds between crawls of one device unless --force

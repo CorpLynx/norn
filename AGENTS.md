@@ -163,6 +163,9 @@ src/nettrace/
     svg.py          static self-contained SVG (icons, boxes, badges, header)
     html.py         single-file offline viewer: SVG + hop list + evidence pane, pan/zoom, deep links
   netutil.py        protocol/port tables, prefix and wildcard matching
+  discovery/        learned links (D18, docs/discovery-spec.md). Pure so far: model, policy (`topology:`), store
+                    (topology.json), join, merge, view, plan, observe/ parsers + secret keep-lists. Sends nothing;
+                    no guard additions until decisions 2/3 are made
   credentials.py    env-var lookup
   drivers/
     cisco_iosxe.py  Netmiko client + per-hop evaluation (CEF, route, ACLs, ARP)

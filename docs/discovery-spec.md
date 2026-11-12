@@ -1,7 +1,11 @@
 # Crawler and auto-discovery spec
 
-Status: DRAFT 1, not built. Needs a decision record in `docs/decisions.md` amending D5 before any
-code (section 12 lists what the owner must decide).
+Status: DRAFT 2. D18 in `docs/decisions.md` amends D5 and records decisions 1, 4, 5, 6, 8, 9 and 10
+(section 12). Decisions 2, 3 and 7 (guard additions, VPN pre-shared keys, Prisma management) are
+still open, so nothing in section 6 is applied. M0 and M1 are built, plus the pure half of M2 and
+M3: the observers' parsers, the AWS and SCM field keep-lists, the dry-run plan and `TopologyView`
+(section 13). Nothing is wired to a transport, the engine or the CLI yet; that waits for decisions
+2 and 3.
 
 This spec turns `docs/topology-discovery-design.md` (the design, with the full rationale, command
 tables and threat model) into something that can be built and tested. Where the two disagree, this
@@ -34,7 +38,8 @@ during a trace, any web UI crawl trigger, scheduled crawls.
 | The Cisco guard accepts any `show ...`, so nothing needs adding | `readonly._CISCO_ALLOWED` is an exact allowlist of 12 patterns | Discovery commands are refused today. They must be **added** (section 6), as a separate discovery list |
 | Duplicate IPs in the discovery cache overwrite silently (P0 prerequisite) | Done: `Inventory.ambiguous`, `ambiguous_owners()`, UNKNOWN next-hop hop, validated and locked cache (R18, G17a) | Removed from the work list. The store reuses `_cache_lock` and the atomic-write pattern in `merge_discovered` |
 | The AWS backend seam has no `service` argument | `AwsEnv.call(account_id, region, op, service="ec2", **params)` | No seam change needed for version 1 |
-| Record the amendment as D14 | D14, D15 and D16 are taken | Use the next free number |
+| Record the amendment as D14 | D14 to D17 are taken | Recorded as D18 |
+| (not covered) | `CiscoClient._auth_failed` holds `time.monotonic()` values | A monotonic clock cannot be persisted across processes; the persisted cooldown stores wall-clock time (moved to M2, where the crawler first needs it) |
 | 12 demo presets | 17 presets, including return-path ones | The golden test covers all of them |
 
 Still true from the design and relied on here: the PAN-OS guard accepts any `<show>` tree, SCM has
@@ -57,8 +62,8 @@ These restate the hard rules for this feature. A change that breaks one is rejec
 6. A parser that cannot parse raises `DeviceError`. It never returns "no rows".
 7. Everything a device says about a neighbour is untrusted text: length-capped, control characters
    stripped at parse time, used as a join key only if it is an IP that parses or a `safe_token`.
-8. No secret is stored, logged or shown. `DescribeVpnConnections` responses are scrubbed before
-   the cache, evidence and audit (section 6.3).
+8. No secret is stored, logged or shown. `DescribeVpnConnections` responses pass a field keep-list
+   before the cache, evidence and audit (section 6.3).
 9. No demo branches. Simulators grow new answers below the four transport seams.
 
 ## 4. Vocabulary
@@ -104,8 +109,10 @@ Nothing here is applied until the owner approves each line (section 12, decision
 ### 6.1 Cisco
 
 A second list, `_CISCO_DISCOVERY`, checked by a new `check_cisco_discovery_command`. The crawler
-calls `CiscoClient.show(cmd, purpose="discovery")`; that path requires the command to match the
-discovery list. Trace and console calls are unchanged and cannot use the discovery list.
+uses a dedicated client class, `DiscoveryCiscoClient(CiscoClient)`, whose `show` checks the
+discovery list and then calls the normal guarded `show`. A flag argument on `CiscoClient.show` was
+rejected: one wrong default would open the discovery list to trace and console calls. Trace and
+console code never constructs the discovery class. The same pattern applies to PAN-OS (6.2).
 
 | Id | Pattern | Already in `_CISCO_ALLOWED` |
 |---|---|---|
@@ -139,17 +146,22 @@ under 2048 characters):
 - A2 `ec2:DescribeCustomerGateways`
 
 A1 returns VPN pre-shared keys (`CustomerGatewayConfiguration`, and tunnel options). IAM cannot
-filter fields. So a **scrubber** runs in `AwsEnv._boto_call_once` and in the backend path, before
-the per-run cache, `Evidence` and anything else sees the response:
+filter fields. So a **field filter** runs in `AwsEnv._boto_call_once` and in the backend path, before
+the per-run cache, `Evidence` and anything else sees the response. It is a keep-list, not a list of
+fields to remove: a field AWS adds later, or one this spec missed, is dropped by default.
 
 ```python
-_SCRUB = {("ec2", "DescribeVpnConnections"):
-          ("VpnConnections[].CustomerGatewayConfiguration",
-           "VpnConnections[].Options.TunnelOptions[].PreSharedKey")}
+_KEEP = {("ec2", "DescribeVpnConnections"): {
+            "VpnConnections[]": ("VpnConnectionId", "CustomerGatewayId", "TransitGatewayId",
+                                 "VpnGatewayId", "State", "Type"),
+            "VpnConnections[].VgwTelemetry[]": ("OutsideIpAddress", "Status"),
+            "VpnConnections[].Options.TunnelOptions[]": ("OutsideIpAddress",)},
+         ("ec2", "DescribeCustomerGateways"): {
+            "CustomerGateways[]": ("CustomerGatewayId", "IpAddress", "State")}}
 ```
 
-A scrubbed field is replaced by the string `"[removed by nettrace]"`. If the owner rejects A1, AWS
-VPN links stay declared and the AWS join in section 9 is not built.
+Every other key in those responses is removed. If the owner rejects A1, AWS VPN links stay declared
+and the AWS join in section 9 is not built.
 
 ### 6.4 Strata Cloud Manager
 
@@ -163,6 +175,11 @@ Today only the HTTP method is checked. Add `check_scm_endpoint(path)`: an exact 
 
 D2–D5 are unverified paths. If Prisma Access turns out to be Panorama-managed (roadmap R2), the SCM
 observer is replaced, not extended.
+
+D4 (`ike-gateways`) returns the IKE pre-shared key (`authentication.pre_shared_key`). The SCM answer
+gets a keep-list too (`discovery/observe/scm.py` `keep_scm_fields`): `ike-gateways` keeps only
+`name` and `peer_address.ip`, `ipsec-tunnels` only `name` and the gateway names. Decision 3 covers
+this key as well as the AWS one.
 
 ## 7. Data contracts
 
@@ -298,7 +315,19 @@ Addresses never used as join keys: `169.254.0.0/16`, loopback, multicast, `0.0.0
 | Device tunnel to device tunnel | `TunnelEnd(D1, I1, local L1, peer P1)` | `TunnelEnd(D2, I2, local L2 = P1, peer P2 = L1)` | **learned**. One side only: **inferred** |
 
 Ambiguity: if one `(device, interface)` end matches two different far ends, neither link is
-learned; both are stored as inferred with `conflicts` naming each other.
+learned; both are stored as inferred with `conflicts` naming each other. Seen from the AWS or Prisma
+end, two tunnels to the same device are not a conflict (a VPN connection has two tunnels); tunnels
+to two different devices are.
+
+Notes on the joins as built in M1:
+
+- Join keys are IPv4 only (IPv6 is not evaluated anywhere in nettrace).
+- A TGW VPN whose attachment id is not known yields no link: the engine looks AWS links up by
+  attachment id, so the far end would be unusable. Its device end is listed as a candidate.
+- Only service connections join. `LinkEnd` has no remote-network field and the engine never leaves
+  a device towards a remote network, so remote networks are observed but not joined.
+- A tunnel whose peer is an inventory device that reported no matching tunnel gives an inferred
+  link to that device (no interface). A peer that is nowhere in the inventory is a candidate.
 
 ## 10. Merge and freshness
 
@@ -306,7 +335,11 @@ Applied in order, for each end of each candidate:
 
 1. A declared link names this end: the declared link is used. If the candidate agrees, its
    provenance is attached to the declared link ("declared, confirmed"). If it disagrees, the
-   declared link gets `conflicts`, and the candidate is stored but never used.
+   declared link gets `conflicts`, and the candidate is stored but never used. The store keeps the
+   confirmation or conflict as a record with `origin: declared` and the declared link's `name`,
+   because a declared link has no stable id of its own (YAML may name a `next_hop`, not an
+   interface). "Agrees" means both ends are the same kind and every field set on both is equal
+   (interface names normalised).
 2. No declared link: the candidate is stored with its origin.
 3. A stored learned link not seen in this run: if **both** its subjects answered, set
    `absent_since`; after two such runs it is removed. If either subject did not answer, it is left
@@ -334,8 +367,14 @@ view.from_prisma(service_connection)          -> same
 ```
 
 - `Found`: declared, or learned and not expired, and unambiguous.
-- `Unusable`: the only matches are inferred, expired, or ambiguous.
+- `Unusable`: the only matches are inferred, expired, absent from the last crawl (`absent_since`
+  set), in conflict, or lead to different places.
 - `None`: nothing known. The engine carries on exactly as today.
+
+Several learned links from one end to the **same device** (an AWS VPN connection always has two
+tunnels, so `from_aws(attachment)` finds both) are `Found` with a far end that names the device but
+no interface, plus a detail note listing the tunnels. The engine then treats the ingress interface
+as inferred (WARN, as today for a Cisco ingress inferred from the route back); it never picks one.
 
 `Tracer._resolve_egress`, `AwsWalker._leave_via` and `prisma.step` call the view instead of
 `Inventory.link_from_*`. On `Unusable` the engine emits one hop
@@ -394,13 +433,20 @@ is present.
 
 | # | Deliverable | Done when |
 |---|---|---|
-| M0 | Decision record. `model.py`, `store.py`, `policy.py`, `Link` fields, interface-name normalisation, persisted auth cooldown | Store round-trips; a corrupt, oversized, symlinked or wrong-schema file is ignored with a warning; all existing tests pass unchanged |
+| M0 | Decision record. `model.py`, `store.py`, `policy.py`, `Link` fields, interface-name normalisation | Store round-trips; a corrupt, oversized, symlinked or wrong-schema file is ignored with a warning; all existing tests pass unchanged. (Persisted auth cooldown moved to M2: nothing crawls before then.) |
 | M1 | `join.py`, `merge.py` with unit tests only (hand-built observations, injected clock) | Every row of sections 9 and 10 has a test, including each ambiguity and "unanswered is not absent" |
 | M2 | Guards (6.1–6.4), AWS scrubber, observers, simulator answers, `topology crawl` and `--dry-run`, `topology show` | A recorder on each seam shows every crawl request matches a discovery list; `show running-config`, a `<request>` and an unlisted AWS call from crawler code raise `ReadOnlyViolation`; the sentinel pre-shared key appears in no cache file, evidence, audit line or CLI output; audit has `"mode":"crawl"` on every line plus begin and end |
 | M3 | `view.py`, engine hook, hop `link` field, `--no-learned`, `topology diff` and `clear` | **Golden test:** with the lab's learnable `links:` removed, a crawl through the seams learns them, and every demo preset gives its `expect` outcome. With an expired or one-sided link the same presets end INCOMPLETE with an UNKNOWN link hop |
 | M4 | Hostile-input tests: 5000 tunnel rows, control characters and markup in names, duplicate addresses, a hung device, two auth failures | Caps raise `DeviceError`; nothing unescaped reaches the terminal, JSON or audit log; the fake connection is opened at most twice |
 
 Only `dc1-internet` (an `external` link) stays declared in the lab; it cannot be learned.
+
+Built ahead of the wiring (all pure, tested in `tests/test_discovery_observe.py`): `observe/cisco.py`,
+`observe/panos.py`, `observe/aws.py` (with `keep_fields`), `observe/scm.py` (with `keep_scm_fields`),
+`plan.py` (the `--dry-run` request list, each line tagged with its guard id) and `view.py`. Left for
+M2 once decisions 2 and 3 are made: the guard entries, `DiscoveryCiscoClient`, wiring the keep-lists
+into `AwsEnv` and `ScmClient`, `crawl.py`, the persisted auth cooldown, simulator answers and the
+CLI. Left for M3: the engine hook (`engine.py` is being changed by other work; wire it after that lands).
 
 ## 14. To verify on real equipment
 

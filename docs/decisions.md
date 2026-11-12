@@ -3,6 +3,30 @@
 Short records of choices made while building nettrace. Each one says why it was made, so a later
 change can be judged against the original reason. Newest first.
 
+## D18. Learned links amend D5: tunnel and attachment joins only, two sources or nothing (2026-11-12)
+- **Why:** every tunnel, TGW VPN attachment and Prisma service connection must be written by hand under `links:`
+  today. The facts already sit in Panorama, the EC2 API, SCM and the devices' own tunnel tables.
+- **Amends D5.** Topology still comes from the inventory. A crawler may add links, but only of the kinds in
+  `docs/discovery-spec.md` section 9 (device tunnel to AWS VPN, to Prisma service connection, to device tunnel).
+  No CDP/LLDP/IGP adjacency, and no login to a device the inventory does not name.
+- **Two sources or nothing.** A link is `learned` only when two observations from different sources agree on both ends.
+  One source is `inferred`, and an inferred, expired, ambiguous or conflicting link never forwards a trace: the hop is
+  UNKNOWN and the trace INCOMPLETE (D6).
+- **The inventory wins.** A declared link is always used; a learned link that disagrees is stored and reported,
+  never applied. The crawler never writes `inventory.yaml` (`topology show --as-inventory` prints YAML to paste).
+- **Accepted defaults (spec section 12):** learned links on once a `topology:` section exists, `--no-learned` to opt out
+  (5); a stale link is used with WARN (6); new exit code 5 for `topology diff`, crawl exits 4 when a subject did not
+  answer (8); store at `<cache_dir>/topology.json` (9); fresh 1 h, max 24 h, cooldown 15 min, 200 devices, 4 sessions (10).
+- **Still open, and nothing depends on them yet:** decision 2 (each guard addition, B6, B7, C1, C2, C4, C11, A1, A2,
+  D1 to D5), decision 3 (the AWS role can read VPN pre-shared keys; nettrace drops them with a field keep-list, IAM cannot)
+  and decision 7 (Prisma via SCM or Panorama). No guard changes until each is approved; M2 waits for them.
+- **Built so far:** M0 and M1 (`src/nettrace/discovery/`: model, policy, store, join, merge), plus pure parsers for every
+  observer, the AWS and SCM field keep-lists, the dry-run plan and the topology view. They send nothing. Without a
+  `topology:` section no store is read and no trace result changes.
+- **SCM keys too.** `ike-gateways` (D4) returns the IKE pre-shared key, so the SCM answer gets a keep-list like AWS.
+- **Two tunnels to one device** (every AWS VPN) give a far end that names the device only; the ingress is then inferred
+  (WARN), never picked.
+
 ## D17. A hop with no route explains itself: BGP and static-route evidence; it never turns a BLOCK into a PASS (2026-11-11)
 - **Why:** "no route to X" was true but useless. The next question is always whether BGP never learned it, a
   neighbor is down, or a static route exists but is not installed.
