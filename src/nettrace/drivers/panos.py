@@ -257,7 +257,7 @@ class PanosClient:
             raise DeviceError(f"{self.device.name}: fib-lookup for {ip} reply not understood "
                               f"(next-hop type {nh_type!r}, interface {interface!r})")
         nh_ip = (result.findtext("ip") or "").strip()
-        next_hop = nh_ip if nh_type == "ip" and nh_ip and nh_ip not in ("0.0.0.0", ip) else None
+        next_hop = nh_ip if nh_type == "ip" and nh_ip and nh_ip not in ("0.0.0.0", ip) else None  # nosec B104 - "no next hop", not a bind address
         return FibResult(interface=interface, next_hop=next_hop, source=result.findtext("src"))
 
     def _match_fields(self, flow: Flow, from_zone: str | None, to_zone: str | None) -> dict[str, Any]:

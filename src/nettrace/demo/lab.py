@@ -28,7 +28,7 @@ ACCT_NET, ACCT_PROD, ACCT_SHARED = "111122223333", "444455556666", "777788889999
 
 def rid(prefix: str, name: str, n: int = 17) -> str:
     """Deterministic AWS-style id, so ids are stable between runs and in screenshots."""
-    return f"{prefix}-0{hashlib.sha1(name.encode()).hexdigest()[:n - 1]}"
+    return f"{prefix}-0{hashlib.sha1(name.encode(), usedforsecurity=False).hexdigest()[:n - 1]}"
 
 
 # ==== Cisco IOS-XE ===================================================================

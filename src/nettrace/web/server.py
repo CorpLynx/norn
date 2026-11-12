@@ -29,7 +29,7 @@ import subprocess
 import sys
 import threading
 import time
-import xml.dom.minidom
+import defusedxml.minidom
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from http import HTTPStatus
@@ -385,7 +385,7 @@ def launch_browser(url: str) -> None:
 
 def pretty_xml(root: Any) -> str:
     text = ET.tostring(root, encoding="unicode")
-    pretty = xml.dom.minidom.parseString(text).toprettyxml(indent="  ")
+    pretty = defusedxml.minidom.parseString(text).toprettyxml(indent="  ")
     return "\n".join(line for line in pretty.splitlines()[1:] if line.strip())
 
 

@@ -37,7 +37,7 @@ def _addr_match(ip: str, any_: str, host: str, net: str, wc: str, group: str) ->
     if host:
         return ip == host
     if net:
-        return wildcard_match(ip, net, wc or "0.0.0.0")
+        return wildcard_match(ip, net, wc or "0.0.0.0")  # nosec B104 - a wildcard mask, not a bind address
     if group:
         return None  # object-group: contents not fetched
     return None
