@@ -55,7 +55,7 @@ BADGE_W = 60        # width reserved per SG/NACL badge on an edge (pill is 54)
 @dataclass
 class Container:
     key: str
-    kind: str  # site | prisma | aws | vpc
+    kind: str  # site | prisma | account | aws | vpc
     label: str
     depth: int
     x: float = 0
@@ -120,7 +120,7 @@ def _container_chain(loc: dict[str, str]) -> list[tuple[str, str, str]]:
     if loc.get("cloud") == "aws" and loc.get("account"):
         acct, name, region = loc["account"], loc.get("account_name") or loc["account"], loc.get("region", "")
         outer_label = f"AWS · {name}" + (f" ({acct})" if name != acct else "") + (f" · {region}" if region else "")
-        chain = [(f"aws:{acct}:{region}", "aws", outer_label)]
+        chain = [(f"aws:{acct}:{region}", "account", outer_label)]  # account+region box: drawn dashed, like the web UI
         if loc.get("vpc"):
             chain.append((f"vpc:{acct}:{loc['vpc']}", "vpc", f"VPC {loc['vpc']}"))
         return chain

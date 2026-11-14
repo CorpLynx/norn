@@ -60,3 +60,7 @@ class Deadline:
             raise Cancelled("cancelled by user")
         if time.monotonic() > self._end:
             raise DeadlineExceeded(f"trace deadline of {self.seconds:g}s exceeded (--timeout / trace_timeout)")
+
+    def renewed(self) -> "Deadline":
+        """A fresh budget of the same length that shares this one's cancel token."""
+        return Deadline(self.seconds, self.cancel)

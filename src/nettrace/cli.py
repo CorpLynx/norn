@@ -151,10 +151,12 @@ def trace() -> None:
 @trace.command("run")
 @flow_options()
 @click.option("--start-at", help="Inventory device to start from (skips source lookup).")
-@click.option("--max-hops", type=click.IntRange(1, 100), default=30, show_default=True)
+@click.option("--max-hops", type=click.IntRange(1, 200), default=64, show_default=True,
+              help="Stop with INCOMPLETE once the result holds this many hops (every listed hop counts).")
 @click.option("--timeout", type=click.FloatRange(1, 3600), default=None,
               help="Overall time budget in seconds (default: inventory trace_timeout, else 120). "
-                   "On expiry the trace ends INCOMPLETE with the hops so far. Ctrl-C does the same (exit 4).")
+                   "On expiry the trace ends INCOMPLETE with the hops so far. Ctrl-C does the same (exit 4). "
+                   "With --return the reverse trace gets its own budget of the same length.")
 @click.option("--no-return-check", is_flag=True, help="Skip NACL return-path checks in AWS.")
 @click.option("--return", "with_return", is_flag=True,
               help="Also trace the return path (destination back to source) and compare it with the forward path "

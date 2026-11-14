@@ -11,12 +11,80 @@ Node match keys used to place hops:
 
 from __future__ import annotations
 
+import copy
 import ipaddress
+import re
 from typing import Any
 
 from nettrace.inventory import Inventory
 
 SEVERITY = {"BLOCK": 4, "UNKNOWN": 3, "WARN": 2, "PASS": 1, "INFO": 0}
+
+
+# ==== interface addresses for the zoomed-in view ==============================================
+# Interface abbreviations as they appear in topology link labels ("Gi1", "Tu200", "e1/1") -> the full name a device
+# reports ("GigabitEthernet1", "Tunnel200", "ethernet1/1"). Only used to match labels to discovered addresses.
+_IF_PREFIX = {"gi": "gigabitethernet", "te": "tengigabitethernet", "twe": "twentyfivegige", "fo": "fortygigabitethernet",
+              "hu": "hundredgigabitethernet", "fa": "fastethernet", "tu": "tunnel", "lo": "loopback", "po": "port-channel",
+              "vl": "vlan", "e": "ethernet", "eth": "ethernet"}
+_ADDR_MAX = 32  # addresses listed for one device (inspector Device tab)
+
+
+def canonical_interface(name: str) -> str:
+    """Lower-case full interface name, so "Gi1" and "GigabitEthernet1" (or "e1/1" and "ethernet1/1") compare equal."""
+    s = name.strip().lower()
+    m = re.match(r"([a-z-]+)(.*)", s)
+    if not m:
+        return s
+    word, rest = m.groups()
+    return _IF_PREFIX.get(word, word) + rest
+
+
+def annotate_addresses(topology: dict[str, Any], inv: Inventory) -> dict[str, Any]:
+    """A copy of `topology` with interface addresses for the UI's close zoom level:
+      node["addrs"] = [{"if": interface, "ip": address}, ...]  for nodes that stand for inventory devices
+      link["a_ip"] / link["b_ip"] = the address of the interface named in a_if / b_if on that end's device
+    Sources: the discovery cache (`nettrace inventory discover`: ip -> device, interface) and each device's static
+    `addresses` (no interface). Nothing is queried; an address the cache does not have is simply not shown, and an
+    ambiguous address (claimed by several devices) is never attributed to one. Values are device-reported text: the UI
+    escapes them like every other trace or topology string."""
+    by_dev: dict[str, list[tuple[str, str]]] = {}
+    for ip, hit in (inv.discovered or {}).items():
+        dev = hit.get("device")
+        if dev in inv.devices:
+            by_dev.setdefault(dev, []).append((str(hit.get("interface") or ""), str(ip)))
+    for dev in inv.devices.values():
+        known = {ip for _if, ip in by_dev.get(dev.name, [])}
+        by_dev.setdefault(dev.name, []).extend(("", ip) for ip in dev.addresses if ip not in known)
+
+    def ip_sort(item: tuple[str, str]) -> tuple[int, Any]:
+        try:
+            return 0, ipaddress.ip_address(item[1])
+        except ValueError:
+            return 1, item[1]
+
+    topo = copy.deepcopy(topology)
+    nodes = {n["id"]: n for n in topo.get("nodes", [])}
+    node_addrs: dict[str, list[tuple[str, str]]] = {}
+    for n in nodes.values():
+        rows = sorted({row for d in n.get("devices", []) for row in by_dev.get(d, [])}, key=lambda r: (r[0] == "", ip_sort(r)))
+        if rows:
+            node_addrs[n["id"]] = rows
+            n["addrs"] = [{"if": i, "ip": ip} for i, ip in rows[:_ADDR_MAX]]
+            if len(rows) > _ADDR_MAX:
+                n["addrs_more"] = len(rows) - _ADDR_MAX
+    for link in topo.get("links", []):
+        for end in ("a", "b"):
+            label, rows = link.get(f"{end}_if"), node_addrs.get(link.get(end, ""))
+            if not label or not rows:
+                continue
+            ips = []
+            for part in str(label).split("·"):  # "e1/1 · e1/2": one link drawn for two interfaces
+                want = canonical_interface(part)
+                ips.extend(ip for i, ip in rows if i and canonical_interface(i) == want)
+            if ips:
+                link[f"{end}_ip"] = " · ".join(ips)
+    return topo
 
 
 # ==== hop -> node ============================================================================

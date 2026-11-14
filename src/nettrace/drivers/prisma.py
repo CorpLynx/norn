@@ -47,6 +47,13 @@ class ScmClient:
         self._cache: dict[str, list[dict[str, Any]]] = {}
         self.evidence: list[Evidence] = []
 
+    def close(self) -> None:
+        """Forget the cached OAuth token. Requests use no persistent session, so there is nothing to close;
+        the client stays usable (a new token is fetched on demand). Idempotent, never raises. A seam
+        transport_override is not touched."""
+        self._token = None
+        self._token_expiry = 0.0
+
     def _get_token(self) -> str:
         if self._token and time.time() < self._token_expiry - 60:
             return self._token

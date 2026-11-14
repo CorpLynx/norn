@@ -163,15 +163,26 @@ def test_cancel_during_return_keeps_the_forward_result_and_marks_the_return_canc
     assert r.to_dict()["Return"]["Cancelled"] is True and [d for d, _ in t.seen] == ["fwd"]
 
 
-def test_return_shares_the_time_budget():
+def test_return_gets_a_fresh_time_budget():
     def expire(self):
-        self.deadline._end = 0  # the whole budget is gone after the forward trace
+        self.deadline._end = 0  # the forward trace used up its whole budget
 
-    t = Scripted({"fwd": expire, "fwd_result": ([fw("fw-a")], OK, "ok"), "ret": ([fw("fw-a")], OK, "never")})
+    t = Scripted({"fwd": expire, "fwd_result": ([fw("fw-a")], OK, "ok"), "ret": ([fw("fw-a")], OK, "back")})
+    r = t.trace_with_return(FWD)
+    assert r.outcome == OK
+    assert r.return_path.outcome == OK, "a slow forward trace must not make the return end 'deadline exceeded'"
+    assert [d for d, _ in t.seen] == ["fwd", "ret"]
+
+
+def test_return_still_ends_incomplete_when_its_own_budget_runs_out():
+    def expire_ret(self):
+        self.deadline._end = 0
+
+    t = Scripted({"fwd": ([fw("fw-a")], OK, "ok"), "ret": expire_ret, "ret_result": ([fw("fw-a")], None, "ret2"),
+                  "ret2": ([fw("fw-a")], OK, "never")})
     r = t.trace_with_return(FWD)
     assert r.outcome == OK
     assert "deadline" in r.return_path.reason and r.return_path.outcome == Outcome.INCOMPLETE
-    assert [d for d, _ in t.seen] == ["fwd"], "no return step ran after the deadline"
     assert exit_code(r) == 4
 
 
@@ -215,6 +226,7 @@ def test_forward_only_json_is_unchanged_and_has_no_return():
     flow = Flow(src="10.1.10.25", dst="10.20.1.50", protocol="tcp", dst_port=443)
     def norm(data):  # evidence of parallel AWS lookups is appended in thread-completion order: sort it
         for h in data["Hops"]:
+            h.pop("elapsed_ms", None)  # wall-clock timing differs run to run
             h["evidence"] = sorted(h["evidence"], key=lambda e: (e["source"], e["request"], e["response"]))
         return data
 

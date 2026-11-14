@@ -103,6 +103,21 @@ map. These tints are always pale; a saturated colour on the canvas is always a s
 grey: a dashed link is a tunnel, a heavy link is a TGW attachment. Device icons keep their own colours; nodes off the traced path
 are faded and greyed so the path stands out.
 
+**Level of detail.** The topology shows more as you zoom in. `apply()` sets `#stage[data-lod]` from
+the zoom scale (`LOD_MID` 0.75, `LOD_NEAR` 1.3) and `--z`:
+
+| Tier | Scale | Shows |
+|---|---|---|
+| far | under 0.75 | device names only, grown so they stay at least about 9px on screen |
+| mid | 0.75 to 1.3 | + model or subnet line, interface names at link ends, link labels |
+| near | 1.3 and up | + the interface address under each interface name |
+
+Detail that is out of range fades (`.lod-mid`, `.lod-near`); nothing is re-rendered while zooming.
+Link labels sit in their own layer above the path and the packet stream, and dim with their link.
+Addresses come from the server (`web.topology.annotate_addresses`): the `inventory discover` cache
+and static `addresses`, never a new query. A device's full list is in the inspector's Device tab
+under Interfaces. A new kind of canvas label picks a tier and takes the matching class.
+
 `#ws` and `#pmview` reset the theme tokens to their light values. Anything placed on the canvas
 inherits that, so it stays readable in dark mode without extra work.
 
@@ -142,17 +157,17 @@ No web fonts: the page must work offline and its CSP blocks them.
 
 ```
 +--------------------------------------------------------------------+
-| Norn  [mode]  [ source -> destination | proto | port ] [opts] Trace |  top bar: the flow, as one line
-+--------------------------------------------------------------------+
-| > Verdict  facts: where it stopped, reason, exit code   [hop ticks] |  what happened
-+-----------+--------------------------------------+-----------------+
-| scenarios |                                      | trace summary   |
-| history   |        topology / path map           | Hop | Device |  |  where          why
-| legend    |           (paper canvas)             | Path map | JSON |
-|           +--------------------------------------+                 |
-|           | playback controls                    | inspector pane  |
-|           | hop list (one row per hop)           | + console       |
-+-----------+--------------------------------------+-----------------+
+| Norn [mode] [ source ⇄ destination | proto | port ] [opts] Trace  ? |  top bar: the flow, as one line
++---------------------------------------------------------------------+
+| > Verdict  stopped at, reason, exit code, ! warnings     [hop ticks] |  what happened
++-----------+--------------------------------------+------------------+
+| scenarios | [Topology|Path map]   [find] [+ - Fit]| trace summary  × |
+|  filter   |        topology / path map           | Hop|Device|JSON  |  where          why
+| history   |           (paper canvas)             |                  |
+|           +--------------------------------------+ inspector pane   |
+|           | playback controls                    | + console        |
+|           | hop list (one row per hop)           | (hidden at start)|
++-----------+--------------------------------------+------------------+
 ```
 
 - Grid areas: `top`, `verd`, `left`, `ws`, `sim`, `insp`. Columns are 288px, flexible, 400px.
@@ -190,11 +205,50 @@ Always produced by `badge()`, which escapes its input.
 **Hop list.** One row per hop: number, tag, where, what happened. The current row has the `--sel`
 fill and an accent bar; rows after the current step are muted. Details expand in place.
 
-**Inspector.** Underlined tabs. Key/value facts use `dl.kv`. Evidence is a `details` per request
+**Live progress.** While a trace runs, the page polls `POST /api/trace/progress` every 250ms. The
+hop list fills row by row (the source row first, so numbers match the final list), each decided hop
+lights its status ring on the canvas, and the device being asked gets a dashed accent ring. The busy
+card floats over the bottom of the canvas rather than covering it. The final result replaces all of it.
+
+**Verdict warnings.** A trace's warnings are a count at the end of the verdict facts ("! 2 warnings",
+in the warn text colour) that expands into a list across the bottom of the band.
+
+**Find.** A search box beside the zoom tools (<kbd>/</kbd>) matches device names, AWS ids, interface
+names and IP addresses (an address the device owns first, then the most specific prefix a node
+stands for; the default route only when nothing else matches). Picking a result centres the device
+at the near zoom tier, highlights it and gives it keyboard focus; it does not open the inspector.
+On a narrow canvas the search and zoom bar moves to a second row under the view switch.
+
+**Left rail.** Scenarios collapse and filter by expected outcome (chips, `aria-pressed`). The legend
+and the keyboard shortcuts live in the help dialog (`?` button in the top bar, or <kbd>?</kbd>), not
+in the rail or under the hop list.
+
+**Flow form.** The arrow between source and destination is a button: hover shows ⇄ and a click swaps
+the two addresses.
+
+**Playback bar at narrow widths.** `#sim` is a size container: under 640px the Replay label and the
+"Playback"/"Speed" words go (screen-reader text stays); under 480px first/last go too. Controls
+never clip.
+
+**Inspector.** Hidden when Norn opens, so the canvas gets the width. Tabs: Hop, Device, JSON (the
+path map lives only on the canvas). It opens when the user clicks a
+device on the canvas (Device tab) or explicitly picks a step: an event row, a verdict tick, the
+"Stopped at" link or a path-map hop (Hop tab). Playback, the step buttons, arrow keys and the
+scrubber never open it. A deep link with `step=` or `node=` opens it. Its × button hides it again
+and returns focus to the canvas. Opening shifts the camera by half the lost width so the view keeps
+its centre, and pans a clicked device back into view if the panel would cover it. Underlined tabs. Key/value facts use `dl.kv`. Evidence is a `details` per request
 with the request in monospace as its summary.
 
 **Console.** Always dark, in both themes, because it is a terminal. The prompt is pinned under
 the scrolling output.
+
+**Panel edges.** The left rail, the inspector and the playback panel resize from the edge they share
+with the canvas. Each edge is an invisible 9px strip (`.split`, `role="separator"`) that shows the
+resize cursor at once and lights up as a 3px accent line after a 150ms hover, like a desktop window
+edge. Drag to resize; when focused, arrow keys move it 16px (Shift 64px), Home and End jump to the
+limits, and Enter or a double-click resets it. The canvas always keeps at least 360px of width and
+180px of height. Sizes live in memory only (no storage APIs), so a reload restores the defaults. A
+new panel that meets the canvas gets the same kind of edge.
 
 **Canvas controls.** Floating segmented groups in the top corners. Anything else that floats on
 the canvas goes in a corner and uses `--raised`, `--line` and `--lift`.
@@ -283,8 +337,5 @@ These come from `AGENTS.md` and are tested.
 
 ## Not yet aligned
 
-- The exported path map (`viz/svg.py`) and the offline viewer (`viz/html.py`) predate this guide.
-  Their container tints are close to the canvas ones, but their accent blue, greys, type and
-  controls are the earlier design. Bringing them onto these tokens is a separate change because
-  the static SVG output is pinned by a test.
 - `docs/demo-packet-flow.gif` was recorded before this design.
+- The path map (`viz/`) shows the forward path only; the return path is on the topology and in the hop list.

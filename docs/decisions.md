@@ -3,6 +3,54 @@
 Short records of choices made while building nettrace. Each one says why it was made, so a later
 change can be judged against the original reason. Newest first.
 
+## D20. First run against real AWS and a real VM-Series: three fixes (2026-11-14)
+Norn's first live run: the aws-networking-lab (four accounts, one Transit Gateway with per-VPC route tables, a PAYG
+VM-Series 11.1 in routed mode, reached `via: direct` with a read-only `superreader` API admin). Each check of the lab's
+expected-reachability matrix was traced and compared; after these fixes all 23 traceable checks match (DNS checks skipped).
+- **TGW route search (V9 refuted as written).** Real AWS wants different value forms per filter and answers the wrong form
+  with an empty list, not an error: `route-search.longest-prefix-match` takes a bare address (`10.0.20.113/32` finds
+  nothing), `route-search.supernet-of-match` takes a CIDR (`10.0.20.113` finds nothing). nettrace sent `/32` to the
+  longest-prefix filter, so every TGW hop was "no route": a false BLOCK on every cross-VPC flow. Now: longest-prefix with
+  the bare address; an empty answer is confirmed with supernet-of-match (`/32`) before it can mean "no route"; any
+  `NetTraceError` (refusal, deadline, cancel) still propagates. `demo/sim_aws.py` now answers both filters exactly like
+  AWS, so a regression fails the tests (`tests/test_aws_live_findings.py`).
+- **Return path: a security group passes the reply of the request it passed (amends D16).** D16 reported every stateful
+  deny on the return flow as INCOMPLETE. On AWS that made every `--return` trace INCOMPLETE at the source's own security
+  group (the reply was evaluated as a new inbound session). Security groups are stateful per ENI by documented AWS
+  behaviour, so a group that allowed the request allows its reply; that is not a session-table guess. Scope, kept
+  narrow so it stays exact: only the forward **source ENI** (its egress PASS before the first route lookup, before any NAT)
+  and the **destination ENI** (its ingress PASS, and only without source NAT, because with SNAT the real reply goes to the
+  translated address). The return hop is a PASS that names the forward hop (`stateful reply (forward hop N ...)`); every
+  other security group, and PAN-OS / Prisma, are still evaluated as a new session and a deny there is still INCOMPLETE.
+- **Symmetry compares a TGW by its attachments, not its route tables.** A TGW picks the route table by the attachment
+  traffic enters from, so the request and its reply normally use different tables (dev's table one way, shared's the other).
+  Comparing tables called every cross-VPC flow ASYMMETRIC. The TGW hop now carries `ingress`/`egress` attachments and
+  `location.tgw`, and the comparison keys on the TGW: same attachments both ways is symmetric; a reply that leaves by
+  another attachment (around an inspection VPC) is still ASYMMETRIC (demo preset `return-asymmetric` unchanged).
+- **Verified on the live systems (see gaps-and-roadmap section 1):** V9 (with the fix), V10, V11, and on PAN-OS 11.1 with
+  legacy routing over the direct XML API: V1, V3, V4. Not exercised: Panorama (V5, V12-V15), advanced routing (V2), Prisma,
+  Cisco. Load balancers and PrivateLink could not be tested: AWS refused `CreateLoadBalancer` in the new lab accounts
+  ("This AWS account currently does not support creating load balancers"), so G13's NLB/PrivateLink work waits for that.
+
+## D19. Engine: an unknown internal next hop is INCOMPLETE; return trace has its own budget; max_hops counts hops (2026-11-12)
+- **Unknown next hop.** A next hop that is not in the inventory used to end EXITED (exit 0), the same as a declared
+  `external` link. Now it ends EXITED only when the next hop is a global address outside every inventory network
+  (an INFO `next-hop` hop shows where it left). A private or non-global address, one inside an inventory network, or
+  text that is not an IP ends INCOMPLETE (exit 4) with an UNKNOWN `next-hop` hop. **Why:** an un-inventoried internal
+  router or a stale discovery cache is not "left the known network"; calling it success was a guess (rule 3).
+- **Egress resolution failures** (for example reading the egress interface IP of a VM-Series) become an UNKNOWN
+  `error` hop, like a driver failure, instead of INCOMPLETE with no hop.
+- **Return trace budget.** `trace_with_return` gives the reverse trace a fresh `Deadline` of the same length and the
+  same cancel token (was: what the forward trace left). **Why:** a slow forward trace made a good path end "return
+  unverified". Cost: a `--return` trace can take up to twice `--timeout`.
+- **`max_hops` counts hops in the result**, not driver steps (one AWS step can add many hops). The default rose from 30
+  to 64 so paths that fitted under the old step count still fit. Hops a driver already returned are never truncated.
+- **Additive output.** `Hop.elapsed_ms` (first hop of each driver step, and link hops) appears in JSON only when set.
+  `Tracer(on_event=...)` receives `step_start` / `hops` / `end` dicts; nothing consumes it yet (a `--return` trace
+  emits `end` twice). A raising `progress` or `on_event` callback never breaks a trace.
+- **`Clients.close()`** now closes PAN-OS, Panorama, SCM and AWS clients too. Each closes only what it created; a
+  session or backend supplied through a transport seam is left alone, and every client stays usable after `close()`.
+
 ## D18. Learned links amend D5: tunnel and attachment joins only, two sources or nothing (2026-11-12)
 - **Why:** every tunnel, TGW VPN attachment and Prisma service connection must be written by hand under `links:`
   today. The facts already sit in Panorama, the EC2 API, SCM and the devices' own tunnel tables.

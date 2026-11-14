@@ -92,6 +92,20 @@ class AwsEnv:
             self._boto3 = boto3
             self.base = install_aws_guard(boto3.Session())
 
+    def close(self) -> None:
+        """Close the botocore clients this object created and drop cached sessions. Idempotent, never raises.
+        A backend_override is owned by whoever installed it and is left alone. The env stays usable:
+        sessions and clients are recreated on demand."""
+        clients, self._clients = self._clients, {}
+        self._sessions = {}
+        if self._backend is not None:
+            return
+        for c in clients.values():
+            try:
+                c.close()
+            except Exception:  # noqa: BLE001
+                pass
+
     # ---- credentials -------------------------------------------------------------
     def account(self, name_or_id: str | None) -> AwsAccount:
         if not name_or_id:
@@ -143,8 +157,8 @@ class AwsEnv:
         if self.deadline:
             self.deadline.check()
         try:
+            api_name = "".join(part.title() for part in op.split("_"))
             if self._backend is not None:
-                api_name = "".join(part.title() for part in op.split("_"))
                 check_aws_operation(service, api_name)  # same rule as the botocore hook
                 result = self._backend.call(account_id, region, op, dict(params))
             else:
@@ -276,12 +290,24 @@ class AwsEnv:
         return tgws[0]["OwnerId"]
 
     def search_tgw_routes(self, acct: str, region: str, rtb: str, ip: str) -> dict[str, Any] | None:
+        """The TGW route the table would use for `ip` (longest prefix), or None if it has none.
+
+        Real AWS (checked 2026-11-14) wants different value forms per filter, and answers the wrong form
+        with an empty list, not an error: `longest-prefix-match` takes a bare address (`10.0.20.113/32`
+        finds nothing) and `supernet-of-match` takes a CIDR (`10.0.20.113` finds nothing). An empty answer
+        must therefore be confirmed with the other filter before it can mean "no route" (D20).
+        """
         host = f"{ip}/32" if ipaddress.ip_address(ip).version == 4 else f"{ip}/128"
+        routes: list[dict[str, Any]] = []
         try:
             routes = self.call(acct, region, "search_transit_gateway_routes", TransitGatewayRouteTableId=rtb,
-                               Filters=[{"Name": "route-search.longest-prefix-match", "Values": [host]}]).get("Routes", [])
-        except Exception:
-            # Older API behaviour: fetch supernet matches and pick the longest ourselves.
+                               Filters=[{"Name": "route-search.longest-prefix-match", "Values": [ip]}]).get("Routes", [])
+        except NetTraceError:  # read-only refusal, deadline, cancel, credentials: never swallowed
+            raise
+        except Exception:  # noqa: BLE001 - an API error for this filter: the supernet search below decides
+            routes = []
+        if not routes:
+            # Every route that contains the address; the longest is picked below.
             routes = self.call(acct, region, "search_transit_gateway_routes", TransitGatewayRouteTableId=rtb,
                                Filters=[{"Name": "route-search.supernet-of-match", "Values": [host]}]).get("Routes", [])
         candidates = []
@@ -420,8 +446,11 @@ class AwsWalker:
     # Components that live at region level, outside any VPC (for map grouping).
     REGIONAL = {"tgw", "tgw-route-table", "exit"}
 
-    def __init__(self, env: AwsEnv, inv: Inventory, check_return: bool = True):
+    def __init__(self, env: AwsEnv, inv: Inventory, check_return: bool = True,
+                 stateful_replies: dict[str, int] | None = None):
         self.env, self.inv, self.check_return = env, inv, check_return
+        # Return trace only: ENI -> forward hop whose security-group PASS makes this reply allowed (symmetry.py).
+        self.stateful_replies = stateful_replies or {}
         self._mark = 0
         self._region: str | None = None  # where the walk currently is; used for hop locations
         self._vpc: str | None = None
@@ -487,6 +516,19 @@ class AwsWalker:
                   peer_eni: dict[str, Any] | None, hops: list[Hop]) -> bool:
         sg_ids = [g["GroupId"] for g in eni.get("Groups", [])]
         if not sg_ids:
+            return True
+        forward_hop = self.stateful_replies.get(eni["NetworkInterfaceId"])
+        if forward_hop is not None:
+            # The reply of a request these groups allowed: security groups are stateful, so AWS lets it through
+            # whatever the rules say (D16, amended). Recorded, not evaluated as a new session.
+            peer_ip = flow.dst if egress else flow.src
+            hops.append(self._hop(acct, "security-group", ",".join(sg_ids), Status.PASS,
+                                  f"{'egress' if egress else 'ingress'} allowed {'to' if egress else 'from'} {peer_ip}: "
+                                  f"reply of the forward flow (security groups are stateful)",
+                                  ingress=None if egress else eni["NetworkInterfaceId"],
+                                  egress=eni["NetworkInterfaceId"] if egress else None,
+                                  policy=f"stateful reply (forward hop {forward_hop} allowed the request)",
+                                  vpc=eni.get("VpcId")))
             return True
         groups = self.env.security_groups(acct, region, sg_ids)
         peer_sgs = {g["GroupId"] for g in (peer_eni or {}).get("Groups", [])}
@@ -691,9 +733,14 @@ class AwsWalker:
         nxt = targets[0]
         if len(targets) > 1:
             details.append("ECMP: " + ", ".join(t["TransitGatewayAttachmentId"] for t in targets) + "; following the first")
-        hops.append(self._hop(owner, "tgw-route-table", rtb, Status.INFO,
-                              f"{dest} -> {nxt['TransitGatewayAttachmentId']} ({nxt.get('ResourceType')} {nxt.get('ResourceId')}) "
-                              f"[{route.get('Type')}]", details=details))
+        hop = self._hop(owner, "tgw-route-table", rtb, Status.INFO,
+                        f"{dest} -> {nxt['TransitGatewayAttachmentId']} ({nxt.get('ResourceType')} {nxt.get('ResourceId')}) "
+                        f"[{route.get('Type')}]", details=details,
+                        ingress=attachment_id, egress=nxt["TransitGatewayAttachmentId"])
+        # The route table depends on the attachment traffic enters from, so the two directions of one flow normally use
+        # different tables; symmetry.py compares the TGW and its attachments instead.
+        hop.location["tgw"] = tgw_id
+        hops.append(hop)
         rtype = nxt.get("ResourceType")
         nxt_id = nxt["TransitGatewayAttachmentId"]
         if rtype == "vpc":

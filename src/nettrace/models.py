@@ -100,7 +100,9 @@ class Hop:
     # Where the hop is, for grouping on the map. Keys used: site (on-prem / Prisma), cloud, account,
     # account_name, region, vpc, vrf, zone_from, zone_to, serial, device_group. All optional.
     location: dict[str, str] = field(default_factory=dict)
-
+    # Wall-clock milliseconds of the driver step (or link resolution) that produced this hop; set on the first hop of
+    # a step only. Serialised only when set.
+    elapsed_ms: int | None = None
 
 @dataclass
 class Symmetry:
@@ -137,7 +139,10 @@ class TraceResult:
             if isinstance(value, Enum):
                 return value.value
             if dataclasses.is_dataclass(value):
-                return {k: convert(v) for k, v in dataclasses.asdict(value).items()}
+                out = {k: convert(v) for k, v in dataclasses.asdict(value).items()}
+                if isinstance(value, Hop) and out.get("elapsed_ms") is None:
+                    out.pop("elapsed_ms", None)  # additive field: absent unless timed
+                return out
             if isinstance(value, list):
                 return [convert(v) for v in value]
             if isinstance(value, dict):

@@ -9,15 +9,35 @@ from typing import Any
 
 from nettrace.viz.model import BADGE_W, BLOCK, ICON, INFO, PASS, UNKNOWN, WARN, Edge, Node, PathMap
 
-STATUS_COLOR = {PASS: "#1e9e5a", BLOCK: "#d93636", WARN: "#d9971c", UNKNOWN: "#8e5bd6", INFO: "#3b82c4"}
+# Colours follow docs/design-guide.md ("Canvas"): fixed values, because the map is always a light paper surface.
+STATUS_COLOR = {PASS: "#157a43", BLOCK: "#c62828", WARN: "#d9971c", UNKNOWN: "#6d3fc0", INFO: "#2f5bd8"}
+RETURN_COLOR = "#0b7285"  # return path (teal, dotted); the offline map is forward-only, kept for callers
+INK, MUTED, LINE, LINE2 = "#161a19", "#56605c", "#d3d9d5", "#b4bdb8"
+PAPER, SHEET, PLINE, DOT = "#eef1ef", "#fafbfa", "#c6cec9", "#cfd6d2"
+ACCENT, ON_WARN = "#2f5bd8", "#1a1300"
+# (fill, stroke, label) per container kind: the GSTYLE table of the web UI canvas; accounts are drawn dashed.
 CONTAINER_STYLE = {
-    "site": ("#f3f5f8", "#9aa7b8", "#4b5a6e"),
-    "prisma": ("#fff5ec", "#f0a35e", "#a3561b"),
-    "aws": ("#fff8ee", "#f29d38", "#9a5a10"),
-    "vpc": ("#eef8ee", "#5aa95a", "#2f6e2f"),
+    "prisma": ("#fff6ec", "#eaa567", "#8f4f12"),
+    "site": ("#f1f5fc", "#9fb2d3", "#33466b"),
+    "aws": ("#fffaf0", "#ecb467", "#855309"),
+    "account": ("#fffdf8", "#e0b77d", "#7d541b"),
+    "vpc": ("#f0f8f1", "#86be8d", "#2c6537"),
 }
-OUTCOME_COLOR = {"REACHABLE": "#1e9e5a", "BLOCKED": "#d93636", "EXITED": "#3b82c4", "INCOMPLETE": "#d9971c"}
-FONT = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+# header stamp: (word, glyph, fill, text colour); the word and glyph carry the outcome, colour is the third signal
+OUTCOME_LABEL = {
+    "REACHABLE": ("Reachable", "✓", STATUS_COLOR[PASS], "#fff"),
+    "BLOCKED": ("Blocked", "✕", STATUS_COLOR[BLOCK], "#fff"),
+    "EXITED": ("Exited known network", "↗", STATUS_COLOR[INFO], "#fff"),
+    "INCOMPLETE": ("Unverified (incomplete)", "?", "#f5b700", ON_WARN),
+}
+UI_FACE = "system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif"
+MONO_FACE = "ui-monospace,'SF Mono','Cascadia Mono',Menlo,Consolas,monospace"
+FONT = f"font-family:{UI_FACE}"
+HALO = f"paint-order:stroke;stroke:{SHEET};stroke-width:3px;stroke-linejoin:round"  # keeps labels legible over lines
+
+
+def _f(size: float, weight: int = 400, mono: bool = False) -> str:
+    return f"font:{weight} {size}px {MONO_FACE if mono else UI_FACE}"
 
 
 def _t(s: Any) -> str:
@@ -59,7 +79,7 @@ def _icon(kind: str) -> str:
                 '<g fill="#2f6db5"><circle cx="8" cy="-6" r="7"/><path d="M-5 17a13 13 0 0 1 26 0z"/></g>')
     if kind == "account":  # AWS account: orange cloud
         return ('<path d="M-21 10a10 10 0 0 1 2-19a13 13 0 0 1 24-5a11 11 0 0 1 15 12a8 8 0 0 1-2 12z" fill="#f29d38"/>'
-                f'<text y="7" text-anchor="middle" fill="{w}" style="font:700 10px sans-serif">AWS</text>')
+                f'<text y="7" text-anchor="middle" fill="{w}" style="font:700 10px system-ui,-apple-system,Roboto,Arial,sans-serif">AWS</text>')
     if kind in ("eni", "endpoint", "host"):  # server
         return ('<rect x="-15" y="-20" width="30" height="40" rx="4" fill="#4b5a6e"/>'
                 '<g fill="#9fb0c4"><rect x="-10" y="-14" width="20" height="4" rx="1"/>'
@@ -73,17 +93,17 @@ def _icon(kind: str) -> str:
                 'fill="#e6edf5" stroke="#8aa0b8" stroke-width="2"/>')
     if kind == "natgw":
         return (f'<rect x="-21" y="-19" width="42" height="38" rx="7" fill="#d67a1e"/>'
-                f'<text y="5" text-anchor="middle" fill="{w}" style="font:700 13px sans-serif">NAT</text>')
+                f'<text y="5" text-anchor="middle" fill="{w}" style="font:700 13px system-ui,-apple-system,Roboto,Arial,sans-serif">NAT</text>')
     if kind in ("gwlbe", "vpce"):
         return (f'<rect x="-21" y="-19" width="42" height="38" rx="7" fill="#6a5acd"/>'
-                f'<text y="5" text-anchor="middle" fill="{w}" style="font:700 11px sans-serif">'
+                f'<text y="5" text-anchor="middle" fill="{w}" style="font:700 11px system-ui,-apple-system,Roboto,Arial,sans-serif">'
                 f'{"GWLB" if kind == "gwlbe" else "VPCE"}</text>')
     if kind == "error":
-        return (f'<circle r="20" fill="#8e5bd6"/><text y="7" text-anchor="middle" fill="{w}" '
-                'style="font:700 20px sans-serif">?</text>')
+        return (f'<circle r="20" fill="#6d3fc0"/><text y="7" text-anchor="middle" fill="{w}" '
+                'style="font:700 20px system-ui,-apple-system,Roboto,Arial,sans-serif">?</text>')
     label = {"peering": "PCX", "vgw": "VGW", "exit": "→"}.get(kind, "•")
     return (f'<rect x="-21" y="-19" width="42" height="38" rx="7" fill="#5c6b80"/>'
-            f'<text y="5" text-anchor="middle" fill="{w}" style="font:700 12px sans-serif">{_t(label)}</text>')
+            f'<text y="5" text-anchor="middle" fill="{w}" style="font:700 12px system-ui,-apple-system,Roboto,Arial,sans-serif">{_t(label)}</text>')
 
 
 # ---- pieces ---------------------------------------------------------------------------------------
@@ -93,25 +113,26 @@ def _node(n: Node) -> str:
     if n.status != INFO or n.role:
         unreached = n.synthetic and n.role == "destination" and n.subtitle != "destination"
         dash = ' stroke-dasharray="5 4"' if unreached else ""
-        ring_color = "#9aa7b8" if unreached else color
-        ring = (f'<rect x="{-ICON / 2 - 4}" y="{-ICON / 2 - 4}" width="{ICON + 8}" height="{ICON + 8}" rx="14" '
+        ring_color = LINE2 if unreached else color
+        ring = (f'<rect x="{-ICON / 2 - 4}" y="{-ICON / 2 - 4}" width="{ICON + 8}" height="{ICON + 8}" rx="16" '
                 f'fill="none" stroke="{ring_color}" stroke-width="{4 if n.status == BLOCK else 2.5}"{dash}/>')
-    tile = f'<rect x="{-ICON / 2}" y="{-ICON / 2}" width="{ICON}" height="{ICON}" rx="11" fill="#fff" stroke="#d5dbe3"/>'
+    tile = f'<rect x="{-ICON / 2}" y="{-ICON / 2}" width="{ICON}" height="{ICON}" rx="12" fill="#fff" stroke="{PLINE}"/>'
     hop = f' data-hop="{n.hops[0]}"' if n.hops else ""
     badge = ""
     if n.status in (BLOCK, WARN, UNKNOWN):
+        glyph_ink = ON_WARN if n.status == WARN else "#fff"
         glyph = {BLOCK: "✕", WARN: "!", UNKNOWN: "?"}[n.status]
         badge = (f'<circle cx="{ICON / 2}" cy="{-ICON / 2}" r="10" fill="{color}"/>'
-                 f'<text x="{ICON / 2}" y="{-ICON / 2 + 4.5}" text-anchor="middle" fill="#fff" '
-                 f'style="font:700 12px sans-serif">{glyph}</text>')
+                 f'<text x="{ICON / 2}" y="{-ICON / 2 + 4.5}" text-anchor="middle" fill="{glyph_ink}" '
+                 f'style="{_f(12, 700)}">{glyph}</text>')
     role = ""
     if n.role:
-        role = (f'<text y="{-ICON / 2 - 12}" text-anchor="middle" fill="#6b7a8f" '
-                f'style="font:600 10px sans-serif;letter-spacing:.08em">{n.role.upper()}</text>')
-    lines = [f'<text y="{ICON / 2 + 18}" text-anchor="middle" fill="#1d2633" style="font:600 13px sans-serif">{_t(_s(n.title, 26))}</text>',
-             f'<text y="{ICON / 2 + 33}" text-anchor="middle" fill="#6b7a8f" style="font:11px sans-serif">{_t(_s(n.subtitle, 30))}</text>']
+        role = (f'<text y="{-ICON / 2 - 12}" text-anchor="middle" fill="{MUTED}" '
+                f'style="{_f(11, 600)};{HALO}">{_t(n.role.capitalize())}</text>')
+    lines = [f'<text y="{ICON / 2 + 18}" text-anchor="middle" fill="{INK}" style="{_f(13, 600)};{HALO}">{_t(_s(n.title, 26))}</text>',
+             f'<text y="{ICON / 2 + 33}" text-anchor="middle" fill="{MUTED}" style="{_f(11, 400, True)};{HALO}">{_t(_s(n.subtitle, 30))}</text>']
     if n.extra:
-        lines.append(f'<text y="{ICON / 2 + 47}" text-anchor="middle" fill="#3b82c4" style="font:11px sans-serif">{_t(_s(n.extra, 30))}</text>')
+        lines.append(f'<text y="{ICON / 2 + 47}" text-anchor="middle" fill="{ACCENT}" style="{_f(11, 400, True)};{HALO}">{_t(_s(n.extra, 30))}</text>')
     title = f"<title>{_t(n.title)} — {_t(n.subtitle)} ({_t(n.status)})</title>"
     return (f'<g class="node" id="{n.id}" transform="translate({n.x:.0f},{n.y:.0f})"{hop}>{title}{ring}{tile}'
             f'{_icon(n.kind)}{badge}{role}{"".join(lines)}</g>')
@@ -129,7 +150,7 @@ def _edge(e: Edge, a: Node, b: Node) -> str:
         stop = next(i for i, bd in enumerate(e.badges) if bd.status == BLOCK)
         bx = _badge_x(e, a, b, stop)
         line = (f'<line x1="{x1:.0f}" y1="{y}" x2="{bx:.0f}" y2="{y}" stroke="{STATUS_COLOR[PASS]}" stroke-width="4"/>'
-                f'<line x1="{bx:.0f}" y1="{y}" x2="{x2:.0f}" y2="{y}" stroke="#c3cad4" stroke-width="3" '
+                f'<line x1="{bx:.0f}" y1="{y}" x2="{x2:.0f}" y2="{y}" stroke="{LINE2}" stroke-width="3" '
                 f'stroke-dasharray="6 5"/>')
     else:
         dash = ' stroke-dasharray="7 6"' if e.dashed else ""
@@ -141,23 +162,24 @@ def _edge(e: Edge, a: Node, b: Node) -> str:
         mid = (x1 + x2) / 2
         hop = f' data-hop="{e.link_hop}"' if e.link_hop else ""
         parts.append(f'<g class="link"{hop}><rect x="{mid - 60:.0f}" y="{y - 31}" width="120" height="18" rx="9" '
-                     f'fill="#fff" stroke="#c9d1db"/><text x="{mid:.0f}" y="{y - 18}" text-anchor="middle" '
-                     f'fill="#4b5a6e" style="font:11px sans-serif"><title>link {_t(e.label)}</title>⇄ {_t(_s(e.label, 16))}'
+                     f'fill="{SHEET}" stroke="{PLINE}"/><text x="{mid:.0f}" y="{y - 18}" text-anchor="middle" '
+                     f'fill="{MUTED}" style="{_f(11, 400, True)}"><title>link {_t(e.label)}</title>⇄ {_t(_s(e.label, 16))}'
                      f'</text></g>')
     for i, bd in enumerate(e.badges):
         bx = _badge_x(e, a, b, i)
         c = STATUS_COLOR.get(bd.status, "#888")
         glyph = {PASS: "✓", BLOCK: "✕", WARN: "!", UNKNOWN: "?"}.get(bd.status, "")
+        glyph_c = "#8a5a00" if bd.status == WARN else c  # amber text on white needs the darker text tone
         parts.append(f'<g class="badge" data-hop="{bd.hop}"><title>{_t(bd.label)}: {_t(bd.text)}</title>'
                      f'<rect x="{bx - 27:.0f}" y="{y - 11}" width="54" height="22" rx="11" fill="#fff" stroke="{c}" '
-                     f'stroke-width="2"/><text x="{bx - 7:.0f}" y="{y + 4}" text-anchor="middle" fill="#1d2633" '
-                     f'style="font:600 10px sans-serif">{bd.label}</text><text x="{bx + 16:.0f}" y="{y + 4.5}" '
-                     f'text-anchor="middle" fill="{c}" style="font:700 12px sans-serif">{glyph}</text></g>')
+                     f'stroke-width="2"/><text x="{bx - 7:.0f}" y="{y + 4}" text-anchor="middle" fill="{INK}" '
+                     f'style="{_f(11, 600)}">{_t(bd.label)}</text><text x="{bx + 16:.0f}" y="{y + 4.5}" '
+                     f'text-anchor="middle" fill="{glyph_c}" style="{_f(12, 700)}">{glyph}</text></g>')
     if e.note and (e.dashed or e.status in (BLOCK, UNKNOWN)) and not e.badges:
         mid = (x1 + x2) / 2
         chars = max(8, int((x2 - x1) / 6.6))
         parts.append(f'<text x="{mid:.0f}" y="{y + 22}" text-anchor="middle" fill="{color}" '
-                     f'style="font:600 11px sans-serif"><title>{_t(e.note)}</title>{_t(_s(e.note, chars))}</text>')
+                     f'style="{_f(11, 600)};{HALO}"><title>{_t(e.note)}</title>{_t(_s(e.note, chars))}</text>')
     return f'<g class="edge" id="{e.id}">{"".join(parts)}</g>'
 
 
@@ -178,11 +200,13 @@ def _header(pm: PathMap) -> str:
         fport = f":{final['dst_port']}" if final.get("dst_port") else ""
         title += f"   after NAT: {final.get('src')} → {final.get('dst')}{fport}"
     outcome = t.get("Outcome", "")
-    color = OUTCOME_COLOR.get(outcome, "#666")
-    return (f'<g transform="translate(24,30)"><rect x="0" y="-18" width="{len(outcome) * 9 + 24}" height="26" rx="6" '
-            f'fill="{color}"/><text x="12" y="0" fill="#fff" style="font:700 13px sans-serif">{_t(outcome)}</text>'
-            f'<text x="{len(outcome) * 9 + 36}" y="0" fill="#1d2633" style="font:600 15px sans-serif">{_t(title)}</text>'
-            f'<text x="0" y="24" fill="#4b5a6e" style="font:12px sans-serif">{_t(_s(t.get("Reason", ""), 160))}</text></g>')
+    word, glyph, fill, ink = OUTCOME_LABEL.get(outcome, (f"Unverified ({outcome})", "?", "#f5b700", ON_WARN))
+    label = f"{glyph} {word}"
+    w = len(label) * 7.6 + 24
+    return (f'<g transform="translate(24,30)"><rect x="0" y="-18" width="{w:.0f}" height="26" rx="5" '
+            f'fill="{fill}"/><text x="12" y="0" fill="{ink}" style="{_f(13, 700)}">{_t(label)}</text>'
+            f'<text x="{w + 12:.0f}" y="0" fill="{INK}" style="{_f(13, 600, True)}">{_t(title)}</text>'
+            f'<text x="0" y="24" fill="{MUTED}" style="{_f(12)}">{_t(_s(t.get("Reason", ""), 160))}</text></g>')
 
 
 def _markers() -> str:
@@ -197,16 +221,20 @@ def render_svg(pm: PathMap, *, header: bool = True) -> str:
     top = 62 if header else 0
     width, height = pm.width, pm.height + top
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}" '
-             f'width="{width:.0f}" height="{height:.0f}" style="{FONT};background:#fbfcfd">',
-             f"<defs>{_markers()}</defs>"]
+             f'width="{width:.0f}" height="{height:.0f}" style="{FONT};background:{PAPER}">',
+             f'<defs>{_markers()}<pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">'
+             f'<circle cx="1.2" cy="1.2" r="1.2" fill="{DOT}"/></pattern></defs>',
+             f'<rect width="{width:.0f}" height="{height:.0f}" fill="{PAPER}"/>'
+             f'<rect width="{width:.0f}" height="{height:.0f}" fill="url(#grid)"/>']
     if header:
         parts.append(_header(pm))
     parts.append(f'<g transform="translate(0,{top})">')
     for c in sorted(pm.containers, key=lambda c: c.depth):
         fill, stroke, text = CONTAINER_STYLE.get(c.kind, CONTAINER_STYLE["site"])
+        dash = ' stroke-dasharray="8 5"' if c.kind == "account" else ""
         parts.append(f'<g class="container"><rect x="{c.x:.0f}" y="{c.y:.0f}" width="{c.w:.0f}" height="{c.h:.0f}" '
-                     f'rx="12" fill="{fill}" stroke="{stroke}" stroke-width="1.5"/>'
-                     f'<text x="{c.x + 14:.0f}" y="{c.y + 19:.0f}" fill="{text}" style="font:600 12px sans-serif">'
+                     f'rx="12" fill="{fill}" stroke="{stroke}" stroke-width="1.2"{dash}/>'
+                     f'<text x="{c.x + 14:.0f}" y="{c.y + 19:.0f}" fill="{text}" style="{_f(12, 600)}">'
                      f'{_t(_s(c.label, max(12, int(c.w / 7.2))))}</text></g>')
     by_id = {n.id: n for n in pm.nodes}
     for e in pm.edges:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ipaddress
+import time
 from typing import Any, Callable
 
 from nettrace import audit, symmetry
@@ -11,7 +13,7 @@ from nettrace.inventory import Device, Inventory, LinkEnd
 from nettrace.models import Flow, Hop, Outcome, Status, TraceResult
 from nettrace.steps import AwsAt, DeviceAt, Egress, Position, PrismaAt, StepResult
 
-DEFAULT_MAX_HOPS = 30
+DEFAULT_MAX_HOPS = 64  # hops in the result (source, device, AWS component and link hops all count)
 ONPREM_SITE = "On-prem"
 PRISMA_SITE = "Prisma Access"
 
@@ -75,16 +77,32 @@ class Clients:
             self._aws.deadline = self.deadline
         return self._aws
 
+    def set_deadline(self, deadline: Deadline | None) -> None:
+        """Point this object and every client already created at a new Deadline (clients created later get it too)."""
+        self.deadline = deadline
+        for c in (*self._devices.values(), self._scm, self._aws):
+            if c is not None:
+                c.deadline = deadline
+        for c in (*self._devices.values(), self._panorama):
+            api = getattr(c, "api", None)
+            if api is not None:
+                api.deadline = deadline
+
     def close(self) -> None:
-        for c in self._devices.values():
-            if hasattr(c, "close"):
-                c.close()
+        """Close every client that has a close(); one failing never stops the rest, and this never raises."""
+        for c in (*self._devices.values(), self._panorama, self._scm, self._aws):
+            fn = getattr(c, "close", None) if c is not None else None
+            if callable(fn):
+                try:
+                    fn()
+                except Exception:  # noqa: BLE001 - closing is best effort
+                    pass
 
 
 class Tracer:
     def __init__(self, inv: Inventory, *, max_hops: int = DEFAULT_MAX_HOPS, check_return: bool = True,
                  progress: Callable[[str], None] | None = None, timeout: float | None = None,
-                 cancel: CancelToken | None = None):
+                 cancel: CancelToken | None = None, on_event: Callable[[dict], None] | None = None):
         self.inv = inv
         self.timeout = timeout if timeout is not None else inv.trace_timeout
         self.cancel = cancel if cancel is not None else CancelToken()
@@ -92,7 +110,34 @@ class Tracer:
         self.clients = Clients(inv, self.deadline)
         self.max_hops = max_hops
         self.check_return = check_return
-        self.progress = progress or (lambda _msg: None)
+        self.stateful_replies: dict[str, int] = {}  # return trace only: see symmetry.stateful_reply_enis
+        self._progress_cb = progress
+        self._on_event = on_event
+
+    def progress(self, msg: str) -> None:
+        """Progress text for the caller. A raising callback never breaks a trace."""
+        if self._progress_cb is not None:
+            try:
+                self._progress_cb(msg)
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _emit(self, event: dict) -> None:
+        if self._on_event is not None:
+            try:
+                self._on_event(event)
+            except Exception:  # noqa: BLE001
+                pass
+
+    @staticmethod
+    def _pos_text(pos: Position) -> str:
+        if isinstance(pos, DeviceAt):
+            return f"device {pos.device}"
+        if isinstance(pos, AwsAt):
+            return f"aws {pos.kind} {pos.resource_id or pos.ip or ''}".strip()
+        if isinstance(pos, PrismaAt):
+            return f"prisma {pos.entry} {pos.name or ''}".strip()
+        return str(pos)
 
     # ---- locations (for map grouping) ---------------------------------------------------------------
     def device_location(self, dev: Device) -> dict[str, str]:
@@ -161,7 +206,8 @@ class Tracer:
             from nettrace.drivers.aws import AwsWalker
 
             self.progress(f"walking AWS from {pos.kind} {pos.resource_id or pos.ip}")
-            return AwsWalker(self.clients.aws, self.inv, check_return=self.check_return).walk(pos, flow)
+            return AwsWalker(self.clients.aws, self.inv, check_return=self.check_return,
+                             stateful_replies=self.stateful_replies).walk(pos, flow)
         if isinstance(pos, PrismaAt):
             if not self.inv.prisma:
                 raise NetTraceError("path enters Prisma Access but prisma_access is not configured in the inventory")
@@ -171,6 +217,11 @@ class Tracer:
                 h.location = {"site": PRISMA_SITE, **h.location}
             return res
         raise NetTraceError(f"unknown position {pos!r}")
+
+    def _emit_hops(self, new: list[Hop]) -> None:
+        if new:
+            self._emit({"event": "hops", "count": len(new),
+                        "hops": [{"node": h.node, "status": h.status.value, "component": h.component} for h in new]})
 
     def _from_link_end(self, there: LinkEnd) -> Position:
         if there.device:
@@ -222,8 +273,42 @@ class Tracer:
                    "fix the duplicate address and run 'nettrace inventory discover' again")
             return None, Outcome.INCOMPLETE, why, Hop(domain="engine", node=eg.device, component="next-hop",
                                                        status=Status.UNKNOWN, summary=why)
-        return None, Outcome.EXITED, (f"next hop {eg.next_hop} from {eg.device} is not in the inventory "
-                                      "(run 'nettrace inventory discover' or add a link)"), None
+        hint = "run 'nettrace inventory discover' or add a link"
+        if self._leaves_known_network(eg.next_hop):
+            return None, Outcome.EXITED, (f"next hop {eg.next_hop} from {eg.device} is not in the inventory "
+                                          f"({hint})"), Hop(domain="engine", node=eg.device, component="next-hop",
+                                                            status=Status.INFO,
+                                                            summary=f"leaves via {eg.device} to {eg.next_hop}, "
+                                                                    "a global address outside the inventory",
+                                                            location=self.device_location(dev))
+        why = (f"next hop {eg.next_hop} from {eg.device} is an internal address that is not in the inventory, "
+               f"so the path beyond it cannot be verified ({hint})")
+        return None, Outcome.INCOMPLETE, why, Hop(domain="engine", node=eg.device, component="next-hop",
+                                                  status=Status.UNKNOWN, summary=why,
+                                                  location=self.device_location(dev))
+
+    def _leaves_known_network(self, ip: str) -> bool:
+        """True only for a global address outside every inventory network. A private address, an address inside an
+        inventory network, or text that is not an IP is internal/unclear (never guess that it left)."""
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            return False
+        return addr.is_global and self.inv.network_for(ip) is None
+
+    def _failure_outcome(self, exc: Exception, pos: Position) -> tuple[bool, Hop | None]:
+        """Shared handling for a driver or egress-resolution failure: (cancelled, UNKNOWN hop to append)."""
+        if self.cancel.cancelled:  # a driver wrapped the Cancelled it hit: still a cancel, not a device fault
+            return True, None
+        if isinstance(exc, ReadOnlyViolation):  # normally logged at the choke point already
+            audit.refused(exc, _audit_kind(pos, self.inv), str(getattr(pos, "device", "") or "-"), str(exc))
+        where: dict[str, str] = {}
+        if isinstance(pos, DeviceAt) and pos.device in self.inv.devices:
+            where = self.device_location(self.inv.devices[pos.device])
+        elif isinstance(pos, PrismaAt):
+            where = {"site": PRISMA_SITE}
+        return False, Hop(domain="engine", node=getattr(pos, "device", None) or type(pos).__name__,
+                          component="error", status=Status.UNKNOWN, summary=_failure(exc), location=where)
 
     # ---- main loop ---------------------------------------------------------------------------------
     def trace(self, flow: Flow, start_at: str | None = None) -> TraceResult:
@@ -232,8 +317,9 @@ class Tracer:
     def trace_with_return(self, flow: Flow, start_at: str | None = None) -> TraceResult:
         """Forward trace, then (only if it ended REACHABLE) the reverse trace and a symmetry comparison.
 
-        Both traces run on this Tracer: one time budget (the return trace gets what is left of it), one cancel token,
-        and the same read-only drivers and connections. A forward trace that did not end REACHABLE gets no return
+        Both traces run on this Tracer: one cancel token and the same read-only drivers and connections. The return
+        trace gets a fresh time budget of the same length as the forward one (a slow forward trace must not make a
+        good path end "return unverified"); a cancel still stops both. A forward trace that did not end REACHABLE gets no return
         trace (Symmetry NOT_RUN) because there is no complete path to compare:
         BLOCKED / INCOMPLETE: the forward path is not established; EXITED: the destination is outside the networks
         nettrace knows, so the reverse trace would start from an address it cannot locate or evaluate.
@@ -248,11 +334,15 @@ class Tracer:
             rflow, notes = symmetry.return_flow(fwd)
             self.progress(f"tracing the return path {rflow.describe()}")
             keep, self.check_return = self.check_return, False  # the AWS return-NACL check is this trace
+            self.stateful_replies = symmetry.stateful_reply_enis(fwd)  # SGs the request passed also pass the reply
+            self.deadline = self.deadline.renewed()
+            self.clients.set_deadline(self.deadline)
             try:
                 with audit.direction("return"):
                     rres = self._trace(rflow, None, close=False)
             finally:
                 self.check_return = keep
+                self.stateful_replies = {}
             fwd.return_path = symmetry.compare(fwd, rflow, rres, notes)
             fwd.warnings = list(dict.fromkeys(fwd.warnings + symmetry.forward_warnings(fwd.return_path)))
             return fwd
@@ -263,18 +353,22 @@ class Tracer:
         original = flow
         hops: list[Hop] = []
         warnings: list[str] = []
-        outcome, reason = Outcome.INCOMPLETE, "max hops reached"
+        outcome, reason = Outcome.INCOMPLETE, f"max hops reached ({self.max_hops})"
         visited: set[str] = set()
         cancelled = False
         try:
             pos, first = self.locate_source(flow, start_at)
             hops.append(first)
-            for _ in range(self.max_hops):
+            for _ in range(self.max_hops):  # step cap: a loop guard; the real limit is len(hops) below
+                if len(hops) >= self.max_hops:
+                    break
                 key = f"{pos!r}|{flow.src}|{flow.dst}"
                 if key in visited:
                     outcome, reason = Outcome.BLOCKED, f"forwarding loop: {pos} visited twice"
                     break
                 visited.add(key)
+                self._emit({"event": "step_start", "position": self._pos_text(pos)})
+                t0 = time.monotonic()
                 try:
                     self.deadline.check()
                     res = self._step(pos, flow)
@@ -282,21 +376,16 @@ class Tracer:
                     cancelled = True
                     break
                 except Exception as exc:  # any driver failure becomes an UNKNOWN hop; hops so far are kept
-                    if self.cancel.cancelled:  # a driver wrapped the Cancelled it hit: still a cancel, not a device fault
-                        cancelled = True
-                        break
-                    if isinstance(exc, ReadOnlyViolation):  # normally logged at the choke point already
-                        audit.refused(exc, _audit_kind(pos, self.inv), str(getattr(pos, "device", "") or "-"), str(exc))
-                    where: dict[str, str] = {}
-                    if isinstance(pos, DeviceAt) and pos.device in self.inv.devices:
-                        where = self.device_location(self.inv.devices[pos.device])
-                    elif isinstance(pos, PrismaAt):
-                        where = {"site": PRISMA_SITE}
-                    hops.append(Hop(domain="engine", node=getattr(pos, "device", None) or type(pos).__name__,
-                                    component="error", status=Status.UNKNOWN, summary=_failure(exc), location=where))
-                    outcome, reason = Outcome.INCOMPLETE, _failure(exc)
+                    cancelled, bad = self._failure_outcome(exc, pos)
+                    if bad is not None:
+                        hops.append(bad)
+                        self._emit_hops([bad])
+                        outcome, reason = Outcome.INCOMPLETE, _failure(exc)
                     break
+                if res.hops:
+                    res.hops[0].elapsed_ms = int((time.monotonic() - t0) * 1000)
                 hops.extend(res.hops)
+                self._emit_hops(res.hops)
                 warnings.extend(res.warnings)
                 flow = res.flow
                 if res.outcome:
@@ -308,9 +397,24 @@ class Tracer:
                 if res.egress is None:
                     outcome, reason = Outcome.INCOMPLETE, "driver returned no next step"
                     break
-                nxt, term, why, link_hop = self._resolve_egress(res.egress, flow)
+                t0 = time.monotonic()
+                try:
+                    self.deadline.check()
+                    nxt, term, why, link_hop = self._resolve_egress(res.egress, flow)
+                except (Cancelled, KeyboardInterrupt):
+                    cancelled = True
+                    break
+                except Exception as exc:  # e.g. the egress interface IP lookup failed on the device
+                    cancelled, bad = self._failure_outcome(exc, DeviceAt(device=res.egress.device))
+                    if bad is not None:
+                        hops.append(bad)
+                        self._emit_hops([bad])
+                        outcome, reason = Outcome.INCOMPLETE, _failure(exc)
+                    break
                 if link_hop:
+                    link_hop.elapsed_ms = int((time.monotonic() - t0) * 1000)
                     hops.append(link_hop)
+                    self._emit_hops([link_hop])
                 if term:
                     outcome, reason = term, why
                     break
@@ -338,5 +442,6 @@ class Tracer:
             warnings.append("some components could not be evaluated; see UNKNOWN hops")
         for i, h in enumerate(hops, start=1):
             h.index = i
+        self._emit({"event": "end", "outcome": outcome.value, "reason": reason})
         return TraceResult(flow=original, outcome=outcome, reason=reason, hops=hops,
                            warnings=list(dict.fromkeys(warnings)), final_flow=flow, cancelled=cancelled)

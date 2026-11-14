@@ -27,8 +27,10 @@
 /* ===== 2. layout ===== */
 *{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden}
 body{font:13px/1.4 var(--ui);font-variant-numeric:tabular-nums;color:var(--text);background:var(--bg);
-display:grid;grid-template-rows:auto auto minmax(0,1fr) 264px;grid-template-columns:288px minmax(0,1fr) 400px;
+display:grid;grid-template-rows:auto auto minmax(0,1fr) var(--bh,264px);grid-template-columns:var(--lw,288px) minmax(0,1fr) var(--rw,400px);
 grid-template-areas:"top top top" "verd verd verd" "left ws insp" "left sim insp"}
+/* the inspector starts hidden (body.noinsp) and opens when a device or a step is clicked; its column collapses to 0 */
+body.noinsp{grid-template-columns:var(--lw,288px) minmax(0,1fr) 0}body.noinsp #insp,body.noinsp #split-r{display:none}
 button{font:inherit;cursor:pointer;color:inherit}button:disabled{cursor:not-allowed}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -36,14 +38,14 @@ button{font:inherit;cursor:pointer;color:inherit}button:disabled{cursor:not-allo
 kbd{font:11px var(--mono);border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--raised)}
 h1,h2,h3{margin:0}
 @media (max-width:600px){#simbar{flex-wrap:wrap}}
-@media (max-width:1180px){body{grid-template-columns:232px minmax(0,1fr) 340px}}
+@media (max-width:1180px){body{grid-template-columns:var(--lw,232px) minmax(0,1fr) var(--rw,340px)}body.noinsp{grid-template-columns:var(--lw,232px) minmax(0,1fr) 0}}
 @media (max-width:900px){
   html,body{overflow:auto;height:auto}body{display:flex;flex-direction:column;min-height:100%;overflow-x:hidden}
   #ws{height:60vh;min-height:320px;flex:none}#sim{height:320px;flex:none}#insp{flex:none;display:block;border-left:0;border-top:1px solid var(--line)}
   #ipane{overflow:visible}#ipane.pmtab{overflow:hidden;height:70vh}#ipane.devtab{display:block;overflow:visible}
   #ipane .devscroll{max-height:none;overflow:visible}#ipane .term{height:300px;flex:none}
   #form{flex-basis:100%}#left{order:9;border-right:0;border-top:1px solid var(--line);overflow:visible}
-  #canvas{touch-action:pan-y}}
+  #canvas{touch-action:pan-y}.split{display:none}}
 /* ===== 3. top bar + trace form (the flow reads as one line: source -> destination, protocol, port) ===== */
 #top{grid-area:top;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--line)}
 #brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;letter-spacing:-.01em}
@@ -53,7 +55,9 @@ h1,h2,h3{margin:0}
 #form{display:flex;flex-wrap:wrap;align-items:center;gap:8px;flex:1;min-width:0;margin:0}
 .flowbar{display:flex;align-items:stretch;min-width:0;background:var(--raised);border:1px solid var(--line2);border-radius:var(--r2)}
 .flowbar.opt{border-color:var(--line);background:none}
-.flowbar .to{display:flex;align-items:center;color:var(--muted);font-size:15px}.flowbar .to+label{border-left:0}
+.flowbar .to{display:flex;align-items:center;color:var(--muted);font-size:15px;background:none;border:0;padding:0 6px;border-radius:var(--r1)}
+.flowbar .to .sw{display:none}.flowbar .to:hover,.flowbar .to:focus-visible{color:var(--accent)}
+.flowbar .to:hover .arr,.flowbar .to:focus-visible .arr{display:none}.flowbar .to:hover .sw,.flowbar .to:focus-visible .sw{display:inline}.flowbar .to+label{border-left:0}
 #form label{display:flex;flex-direction:column;min-width:0;padding:4px 10px 5px;border-left:1px solid var(--line);font-size:10.5px;line-height:1.3;color:var(--muted);cursor:text;transition:background var(--fast)}
 .flowbar>label:first-child{border-left:0;border-radius:7px 0 0 7px}.flowbar>label:last-child{border-radius:0 7px 7px 0}
 .flowbar label:hover{background:var(--soft)}.flowbar label:focus-within{background:var(--raised);box-shadow:inset 0 0 0 2px var(--focus);color:var(--text)}
@@ -70,6 +74,12 @@ h1,h2,h3{margin:0}
 #cancel[hidden]{display:none}.cancelbtn:disabled{opacity:.6;cursor:wait}
 #ferrs{flex-basis:100%;margin:0;padding:0;list-style:none;color:var(--t-block);font-size:12px}#ferrs li{margin-top:2px}
 #top .sp{display:none}#ver{color:var(--muted);font-size:11.5px;margin-left:auto}
+#helpbtn{width:28px;height:28px;border-radius:50%;border:1px solid var(--line2);background:var(--raised);color:var(--muted);font-weight:700}
+#helpbtn:hover{color:var(--accent);border-color:var(--accent)}
+#help{max-width:min(560px,calc(100vw - 32px));padding:18px 20px 16px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--lift)}
+#help::backdrop{background:rgba(15,18,17,.35)}#help h2{font-size:15px;margin:0 0 12px}#help h3{font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 6px}
+#help .keys{display:grid;grid-template-columns:auto 1fr;gap:5px 14px;margin:0;font-size:12.5px}#help .keys dt{white-space:nowrap}#help .keys dd{margin:0;color:var(--muted)}
+#help .hfoot{display:flex;justify-content:flex-end;margin-top:14px}#help .hfoot button{height:32px;padding:0 14px;border-radius:var(--r2);border:1px solid var(--line2);background:var(--raised)}
 /* ===== 4. verdict band: outcome flag, facts, one tick per hop ===== */
 #verdict{grid-area:verd;display:none;align-items:stretch;min-width:0;overflow:hidden;background:var(--panel);border-bottom:1px solid var(--line);--vc:var(--muted);--vf:#fff}
 #verdict.on{display:flex;flex-wrap:wrap;background:color-mix(in srgb,var(--vc) 9%,var(--panel))}
@@ -87,6 +97,9 @@ h1,h2,h3{margin:0}
 .tk.INFO{background:var(--tint);color:var(--t-info)}
 .tk:hover{transform:translateY(-1px)}.tk.cur{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--ink)}
 .tksep{color:var(--muted);padding:0 3px}
+#verdict .lnk.warnlnk{color:var(--t-warn)}
+.vwarn{flex-basis:100%;margin:0;padding:7px 14px 9px 34px;font-size:12px;line-height:1.45;color:var(--t-warn);border-top:1px solid color-mix(in srgb,var(--vc) 25%,transparent)}
+.vwarn[hidden]{display:none}.vwarn li{overflow-wrap:anywhere}
 .sym{font-weight:700}.sym-SYMMETRIC{color:var(--t-pass)}.sym-ASYMMETRIC,.sym-UNKNOWN{color:var(--t-warn)}.sym-NOT_RUN{color:var(--muted)}
 @keyframes flagin{from{transform:translateX(-102%)}}@keyframes fadein{from{opacity:0}}@keyframes tickin{from{opacity:0;transform:translateY(5px)}}
 /* ===== 5. left rail: scenarios, history, legend ===== */
@@ -97,7 +110,14 @@ h1,h2,h3{margin:0}
 .lab{font-size:12px;color:var(--muted);line-height:1.45}.lab b{color:var(--text)}
 #labsec h2{margin:0}#labtoggle{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;padding:2px 0;text-align:left;font:inherit;font-size:12px;font-weight:600;color:var(--muted)}
 #labtoggle:hover{color:var(--accent)}#labtoggle .ch{font-size:10px;width:1em;flex:none}#labinfo{margin-top:8px}#labinfo[hidden]{display:none}
-#presetsec{padding-left:0;padding-right:0}#presetsec h2{padding:0 14px}
+#presetsec{padding-left:0;padding-right:0}#presetsec h2{padding:0 14px;margin:0}
+#presettoggle{display:flex;align-items:center;gap:6px;width:100%;background:none;border:0;padding:2px 0;text-align:left;font:inherit;font-size:12px;font-weight:600;color:var(--muted)}
+#presettoggle:hover{color:var(--accent)}#presettoggle .ch{font-size:10px;width:1em;flex:none}#presettoggle .count{font-weight:400}
+#presetbody[hidden]{display:none}#presetbody{margin-top:8px}
+#pfilter{display:flex;flex-wrap:wrap;gap:4px;padding:0 14px 8px}
+#pfilter button{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 9px;border-radius:99px;border:1px solid var(--line);background:none;font-size:11.5px;color:var(--muted)}
+#pfilter button:hover{border-color:var(--accent);color:var(--accent)}#pfilter button[aria-pressed=true]{background:var(--tint);border-color:var(--accent);color:var(--accent)}
+#pfilter .g{font-weight:800}.preset[hidden]{display:none}
 .preset{position:relative;display:grid;grid-template-columns:18px minmax(0,1fr);column-gap:9px;width:100%;text-align:left;border:0;padding:8px 14px;background:none;transition:background var(--fast)}
 .preset::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;border-radius:0 3px 3px 0;background:var(--accent);transform:scaleY(0);transition:transform var(--med) var(--ease)}
 .preset:hover{background:var(--soft)}.preset.on{background:var(--sel)}.preset.on::before{transform:scaleY(1)}
@@ -117,21 +137,35 @@ h1,h2,h3{margin:0}
 .empty{color:var(--muted);padding:14px;line-height:1.45}
 /* ===== 6. workspace: canvas, tools ===== */
 #ws{grid-area:ws;position:relative;overflow:hidden;background:var(--paper);min-width:0}
+/* a narrow canvas puts search and zoom on a second row under the view switch, so they never cover it */
+#ws{container:ws/inline-size}
 #tabs,#tools{position:absolute;top:12px;z-index:3;display:flex;padding:3px;gap:2px;background:var(--raised);border:1px solid var(--line);border-radius:10px;box-shadow:var(--lift)}
-#tabs{left:12px}#tools{right:12px}
+#tabs{left:12px}#tools{position:static}
+#canvasbar{position:absolute;top:12px;right:12px;z-index:3;display:flex;gap:8px;align-items:flex-start;max-width:calc(100% - 220px)}
+#findbox{position:relative;min-width:0}
+@container ws (max-width:700px){#canvasbar{top:58px;left:12px;right:auto;max-width:calc(100% - 24px)}#findbox{flex:none}#find{width:150px}}
+#find{width:210px;max-width:100%;height:38px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--raised);color:var(--text);font:12.5px var(--ui);box-shadow:var(--lift)}
+#find:focus{outline:2px solid var(--focus);outline-offset:1px}
+#findres{position:absolute;top:42px;left:0;right:0;min-width:240px;margin:0;padding:4px;list-style:none;background:var(--raised);border:1px solid var(--line);border-radius:var(--r2);box-shadow:var(--lift);max-height:300px;overflow:auto}
+#findres[hidden]{display:none}#findres li{padding:6px 8px;border-radius:var(--r1);cursor:pointer;line-height:1.3}
+#findres li[aria-selected=true],#findres li:hover{background:var(--sel)}#findres .why{display:block;font:11px var(--mono);color:var(--muted);overflow-wrap:anywhere}
+#findres .none{color:var(--muted);cursor:default}#findres .none:hover{background:none}
+.node.found .tile{stroke:#2f5bd8;stroke-width:2.6}.node.found .ping{animation:ping .7s var(--ease) 2}
 .tab,#tools button{background:none;border:0;border-radius:7px;padding:4px 12px;font-weight:600;color:var(--muted);min-width:30px;transition:background var(--fast),color var(--fast)}
 .tab:hover,#tools button:hover{color:var(--accent);background:var(--sel)}
 .tab[aria-pressed=true]{background:var(--accent-bg);color:#fff}
 #canvas{position:absolute;inset:0;cursor:grab}#canvas.drag{cursor:grabbing}
 #stage{position:absolute;left:0;top:0;transform-origin:0 0}#stage.glide{transition:transform var(--slow) var(--ease)}
-#hint{position:absolute;left:12px;bottom:10px;z-index:3;font-size:11.5px;color:var(--muted);background:#fffffff0;border:1px solid var(--line);padding:3px 9px;border-radius:var(--r2);max-width:calc(100% - 24px)}
+#hint{position:absolute;left:12px;bottom:10px;z-index:3;transition:opacity var(--slow);font-size:11.5px;color:var(--muted);background:#fffffff0;border:1px solid var(--line);padding:3px 9px;border-radius:var(--r2);max-width:calc(100% - 24px)}
 #pmview{position:absolute;inset:54px 12px 12px;background:#fff;border:1px solid var(--line);border-radius:var(--r3);display:none}
 .pmbox{display:flex;overflow:auto;scrollbar-gutter:stable;padding:6px}.pmbox svg{flex:none;margin:auto;display:block}
 #ipane.pmtab{display:flex;flex-direction:column;overflow:hidden}#ipane .pmbox{flex:1 1 0;min-height:120px;background:#fff;border:1px solid var(--line);border-radius:var(--r2);color:#161a19}
 #ipane.pmtab .lab{flex:none;margin:8px 0 0}
-#busy{position:absolute;inset:0;background:#eef1efd9;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:4;font-weight:600;color:var(--text);text-align:center;padding:20px;animation:fadein var(--med) ease-out}
-#busy .bx{display:flex;flex-direction:column;align-items:center;gap:12px;max-width:520px;padding:20px 24px;background:var(--raised);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--lift)}
-#busy .brow{display:flex;flex-direction:column;align-items:center;gap:12px}#busy .bnote{font-weight:400;font-size:12px;color:var(--muted)}
+#hint.gone{opacity:0;pointer-events:none}
+/* busy card: floats over the bottom of the canvas so the hops lighting up live stay visible */
+#busy{position:absolute;left:50%;bottom:52px;transform:translateX(-50%);width:min(460px,calc(100% - 24px));display:none;justify-content:center;z-index:4;font-weight:600;color:var(--text);text-align:center;animation:fadein var(--med) ease-out}
+#busy .bx{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;padding:16px 20px;background:var(--raised);border:1px solid var(--line);border-radius:var(--r3);box-shadow:var(--lift)}
+#busy .brow{display:flex;align-items:center;gap:14px}#busy .bnote{font-weight:400;font-size:11.5px;color:var(--muted)}
 /* waiting: a probe stepping along five hops (not a spinner; the trace really is walking hop by hop) */
 .spin{position:relative;display:flex;gap:16px;flex:none}.spin::before{content:"";position:absolute;left:4px;right:4px;top:50%;height:2px;margin-top:-1px;background:var(--line2)}
 .spin i{position:relative;width:10px;height:10px;border-radius:50%;background:var(--raised);border:2px solid var(--line2);animation:probe 1.5s ease-in-out infinite}
@@ -142,10 +176,19 @@ h1,h2,h3{margin:0}
 .node:hover .tile{stroke:#2f5bd8}.node.sel .tile{stroke:#2f5bd8;stroke-width:2.6}.node:focus{outline:none}.node:focus-visible .tile{stroke:#2f5bd8;stroke-width:4}
 .node .lbl{font:600 12.5px var(--ui);fill:#161a19;paint-order:stroke;stroke:var(--sheet);stroke-width:4px;stroke-linejoin:round}
 .node .sub{font:10.5px var(--ui);fill:#56605c;paint-order:stroke;stroke:var(--sheet);stroke-width:4px;stroke-linejoin:round}
-.node.dim{opacity:.42;filter:grayscale(1)}.link{transition:opacity var(--slow)}.link.dim{opacity:.3}
+.node.dim{opacity:.42;filter:grayscale(1)}
+.node.probe .ring{display:block!important;color:#2f5bd8;stroke-dasharray:6 5;animation:probering 1s linear infinite}@keyframes probering{to{stroke-dashoffset:-22}}.link{transition:opacity var(--slow)}.link.dim{opacity:.3}
 .link line{stroke:#87928c;stroke-width:1.8}.link.tunnel line{stroke-dasharray:7 5}
 .link.attachment line{stroke:#a3ada8;stroke-width:3.4}
 .iflbl{font:10px var(--mono);fill:#3c4541;paint-order:stroke;stroke:var(--sheet);stroke-width:4px}
+.ifip{font:9.5px var(--mono);fill:#2f5bd8;paint-order:stroke;stroke:var(--sheet);stroke-width:4px}
+/* level of detail, from the zoom scale (apply() sets #stage[data-lod] and --z): far = device names only, kept readable by
+   growing them as the map shrinks; mid = + model/subnet lines, interface names and link labels; near = + the interface
+   addresses at each link end. Hidden detail fades; it is never re-rendered. A device's full address list is in the
+   inspector's Device tab. */
+.lod-mid,.lod-near{opacity:0;transition:opacity var(--med)}
+#stage[data-lod=mid] .lod-mid,#stage[data-lod=near] .lod-mid,#stage[data-lod=near] .lod-near{opacity:1}
+.node .lbl{font-size:min(17px,max(12.5px,calc(9px / var(--z,1))))}
 .lnklbl rect{fill:#fff;stroke:var(--pline)}.lnklbl text{font:10px var(--ui);fill:#56605c}
 .ring,.ping{fill:none;transform-box:fill-box;transform-origin:center}
 .ring{stroke:currentColor;stroke-width:3.2;animation:ringin var(--slow) var(--ease)}
@@ -168,7 +211,11 @@ h1,h2,h3{margin:0}
 .stamp{font:700 10px var(--ui);letter-spacing:.06em}
 .pmnote{position:absolute;left:12px;bottom:8px;max-width:calc(100% - 24px);background:#fffffff0;padding:2px 8px;border-radius:99px;font-size:11.5px;color:#56605c}
 /* ===== 7. playback panel: controls, scrubber, event list ===== */
-#sim{grid-area:sim;background:var(--panel);border-top:1px solid var(--line);display:grid;grid-template-rows:auto minmax(0,1fr) auto;grid-template-columns:minmax(0,1fr);min-height:0;min-width:0}
+#sim{grid-area:sim;background:var(--panel);border-top:1px solid var(--line);display:grid;grid-template-rows:auto minmax(0,1fr);grid-template-columns:minmax(0,1fr);min-height:0;min-width:0;container:sim/inline-size}
+/* a narrow playback panel drops words before controls: Replay's label, then the first/last buttons */
+@container sim (max-width:640px){#replay .t{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}#replay{width:30px;padding:0;margin-right:4px}
+  #simbar>b,#simbar label[for=speed]{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
+@container sim (max-width:480px){#first,#last{display:none}#scrub{min-width:36px}}
 #simbar{display:flex;flex-wrap:nowrap;align-items:center;gap:2px;padding:6px 12px;border-bottom:1px solid var(--line)}
 #simbar b{font-size:12px;font-weight:600;color:var(--muted);margin-right:8px}
 .ctl{display:grid;place-items:center;background:none;border:0;border-radius:var(--r1);width:30px;height:30px;color:var(--text);transition:background var(--fast),transform var(--fast)}
@@ -187,6 +234,7 @@ h1,h2,h3{margin:0}
 #events table{width:100%;border-collapse:collapse;table-layout:fixed}
 #events th{position:sticky;top:0;background:var(--panel);text-align:left;font-size:11.5px;font-weight:500;color:var(--muted);padding:5px 8px;border-bottom:1px solid var(--line);z-index:1}
 #events td{padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background var(--med),color var(--med)}
+#events tr.live td{animation:fadein var(--med) ease-out}#events tr.livewait td{color:var(--muted)}
 #events tr.ev{cursor:pointer}#events tr.ev:hover{background:var(--soft)}#events tr.cur{background:var(--sel);box-shadow:inset 3px 0 0 var(--accent)}
 #events tr.hl{outline:2px dashed var(--accent);outline-offset:-2px}#events tr.future td:not(:first-child){color:var(--muted)}#events tr.future .pill{opacity:.55}
 #events tr.rdiv td{background:var(--soft);border-top:1px solid var(--line2);border-bottom:1px solid var(--line2);font-weight:600;white-space:normal;padding:7px 12px}
@@ -199,8 +247,10 @@ h1,h2,h3{margin:0}
 .pill.PASS{background:var(--b-pass)}.pill.BLOCK{background:var(--b-block)}.pill.WARN{background:var(--b-warn);color:var(--fg-warn)}.pill.UNKNOWN{background:var(--b-unk)}
 .pill.INFO{background:var(--tint);color:var(--t-info)}
 /* ===== 8. inspector + console ===== */
-#insp{grid-area:insp;background:var(--panel);border-left:1px solid var(--line);display:grid;grid-template-rows:auto auto minmax(0,1fr);min-height:0;min-width:0}
-#summary{padding:10px 16px;border-bottom:1px solid var(--line)}#summary>b{font:600 13px var(--mono)}
+#insp{grid-area:insp;position:relative;background:var(--panel);border-left:1px solid var(--line);display:grid;grid-template-rows:auto auto minmax(0,1fr);min-height:0;min-width:0}
+#summary{padding:10px 48px 10px 16px;border-bottom:1px solid var(--line)}
+#inspclose{position:absolute;top:6px;right:8px;z-index:1}
+#insp.enter{animation:inspin var(--med) var(--ease)}@keyframes inspin{from{opacity:0;transform:translateX(18px)}}#summary>b{font:600 13px var(--mono)}
 #summary .r{color:var(--muted);margin-top:4px;line-height:1.35}
 #summary ul{margin:5px 0 0;padding-left:16px;color:var(--t-warn);font-size:12px}
 #itabs{display:flex;padding:0 8px;border-bottom:1px solid var(--line)}
@@ -210,6 +260,7 @@ h1,h2,h3{margin:0}
 #ipane h3{margin:0 0 4px;font-size:15px;letter-spacing:-.005em}#ipane .lead{margin:0 0 12px}
 dl.kv{display:grid;grid-template-columns:92px 1fr;gap:5px 10px;margin:0 0 14px}dl.kv dt{color:var(--muted)}dl.kv dd{margin:0;overflow-wrap:anywhere}
 ul.det{padding-left:16px;margin:4px 0 12px}
+dl.addrl{grid-template-columns:auto 1fr;margin-top:4px;font:12px var(--mono)}dl.addrl dt{color:var(--text)}dl.addrl dd{color:var(--accent)}
 #ipane a,.lnkbtn{color:var(--accent);text-underline-offset:2px}
 details.ev{border:1px solid var(--line);border-radius:var(--r2);margin:6px 0;overflow:hidden}details.ev summary{padding:6px 9px;cursor:pointer;font:11px var(--mono);color:var(--accent);overflow-wrap:anywhere}
 details.ev summary:hover{background:var(--soft)}details.ev[open] summary{border-bottom:1px solid var(--line)}
@@ -230,10 +281,22 @@ pre{margin:0;padding:9px;max-height:300px;overflow:auto;background:var(--code);f
 #err{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#2b1416;color:#ffe0dd;border:1px solid #ff8a80;padding:10px 16px;border-radius:var(--r2);box-shadow:var(--lift);display:none;z-index:10;max-width:min(90%,640px);cursor:pointer;line-height:1.4;animation:toastin var(--med) var(--ease)}
 @keyframes toastin{from{opacity:0;transform:translate(-50%,10px)}}
 .fatal{max-width:640px;margin:60px auto;padding:20px;font:15px/1.5 var(--ui);border:2px solid var(--b-block);border-radius:var(--r3);background:var(--panel);color:var(--text)}
+/* ===== 8b. panel resize handles: an invisible strip over each edge that meets the canvas. The edge line lights up after a
+   short hover (like a desktop window edge); drag to resize, arrow keys when focused, double-click or Enter to reset. ===== */
+.split{position:relative;z-index:5;touch-action:none;outline-offset:-2px}
+.split::after{content:"";position:absolute;background:var(--accent-bg);opacity:0;transition:opacity var(--fast) 0s}
+.split:hover::after,.split:focus-visible::after,.split.drag::after{opacity:1;transition-delay:.15s}.split.drag::after{transition-delay:0s}
+#split-l,#split-r{grid-row:3/5;grid-column:2;width:9px;cursor:col-resize}
+#split-l{justify-self:start;margin-left:-5px}#split-r{justify-self:end;margin-right:-5px}
+#split-l::after,#split-r::after{top:0;bottom:0;left:3px;width:3px}
+#split-b{grid-row:4;grid-column:2;align-self:start;height:9px;margin-top:-5px;cursor:row-resize}
+#split-b::after{left:0;right:0;top:3px;height:3px}
+body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!important}body.resizing.rows,body.resizing.rows *{cursor:row-resize!important}
+body.resizing #stage{transition:none}
 /* ===== 9. reduced motion: no animation or transition anywhere; the path is shown as a static dashed line and stepped by hand ===== */
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 </style></head>
-<body>
+<body class="noinsp">
 <a class="skip" href="#ws" id="skip">Skip to topology</a>
 <header id="top">
   <h1 id="brand"><svg viewBox="0 0 26 26" aria-hidden="true"><path d="M8 13L18 7M8 13l10 6" stroke-width="2" fill="none"/><circle class="n0" cx="5" cy="13" r="3.4"/><circle class="n1" cx="21" cy="6" r="3.4"/><circle class="n2" cx="21" cy="20" r="3.4"/></svg>Norn</h1>
@@ -241,7 +304,7 @@ pre{margin:0;padding:9px;max-height:300px;overflow:auto;background:var(--code);f
   <form id="form" aria-label="Trace a flow" novalidate>
     <div class="flowbar">
       <label>Source<input id="f-src" placeholder="10.1.10.25" spellcheck="false" autocomplete="off" aria-describedby="ferrs"></label>
-      <span class="to" aria-hidden="true">→</span>
+      <button type="button" class="to" id="swap" aria-label="Swap source and destination" title="Swap source and destination"><span class="arr" aria-hidden="true">→</span><span class="sw" aria-hidden="true">⇄</span></button>
       <label>Destination<input id="f-dst" placeholder="10.20.1.50" spellcheck="false" autocomplete="off" aria-describedby="ferrs"></label>
       <label>Protocol<select id="f-proto"><option>tcp</option><option>udp</option><option>icmp</option></select></label>
       <label>Port<input id="f-port" class="sm" placeholder="443" inputmode="numeric" autocomplete="off" aria-describedby="ferrs"></label>
@@ -256,54 +319,76 @@ pre{margin:0;padding:9px;max-height:300px;overflow:auto;background:var(--code);f
     <button id="cancel" class="cancelbtn" type="button" hidden title="Cancel the running trace (Esc in the busy overlay)">Cancel</button>
     <ul id="ferrs" aria-live="polite"></ul>
   </form>
-  <span class="sp"></span><span id="ver"></span>
+  <span class="sp"></span><span id="ver"></span><button type="button" id="helpbtn" aria-haspopup="dialog" aria-controls="help" aria-label="Legend and keyboard shortcuts" title="Legend and keyboard shortcuts (?)">?</button>
 </header>
 
 <section id="verdict" aria-label="Trace result" role="status" aria-live="polite"></section>
 
 <aside id="left" aria-label="Scenarios, history and legend">
   <div class="sec" id="labsec"><h2><button type="button" id="labtoggle" aria-expanded="true" aria-controls="labinfo"><span class="ch" aria-hidden="true">▾</span><span id="labtitle">About this lab</span></button></h2><div class="lab" id="labinfo"></div></div>
-  <div class="sec" id="presetsec"><h2>Scenarios</h2><div id="presets" role="group" aria-label="Scenarios"></div></div>
+  <div class="sec" id="presetsec"><h2><button type="button" id="presettoggle" aria-expanded="true" aria-controls="presetbody"><span class="ch" aria-hidden="true">▾</span>Scenarios <span class="count" id="presetcount"></span></button></h2><div id="presetbody"><div id="pfilter" role="group" aria-label="Show scenarios by expected outcome"></div><div id="presets" role="group" aria-label="Scenarios"></div></div></div>
   <div class="sec"><h2>History</h2><div id="history"><div class="empty" style="padding:0">No traces yet.</div></div></div>
-  <div class="sec legend"><h2>Legend</h2>
-    <span><i class="g" style="color:var(--t-pass)" aria-hidden="true">✓</i>pass</span><span><i class="g" style="color:var(--t-block)" aria-hidden="true">✕</i>block</span>
-    <span><i class="g" style="color:var(--t-warn)" aria-hidden="true">!</i>warn</span><span><i class="g" style="color:var(--t-unk)" aria-hidden="true">?</i>unknown (unverified)</span>
-    <span><i class="g" style="color:var(--t-info)" aria-hidden="true">i</i>lookup / info</span>
-    <div class="lab" style="margin-top:6px">Blue marks what you can act on and neutral lookups; green, red, amber and violet are verdicts. Dotted teal line, opposite direction = return path (only with “Include return path”). Dashed grey link = tunnel (IPsec / GlobalProtect / service connection). Heavy grey link = TGW attachment. Unknown or warn hops are never shown as success.</div></div>
 </aside>
 
 <main id="ws" tabindex="-1" aria-label="Topology" aria-busy="false">
   <h2 class="sr">Topology and path map</h2>
   <div id="tabs" role="group" aria-label="View"><button class="tab" data-view="topo" aria-pressed="true">Topology</button><button class="tab" data-view="pm" aria-pressed="false">Path map</button></div>
-  <div id="tools" role="group" aria-label="Canvas zoom"><button id="zin" aria-label="Zoom in" title="Zoom in (+)">+</button><button id="zout" aria-label="Zoom out" title="Zoom out (-)">−</button><button id="fit" title="Fit whole topology to the view (F)">Fit</button><button id="focus" title="Zoom to the traced path (Z)">Path</button></div>
+  <div id="canvasbar"><div id="findbox" role="search"><input id="find" type="search" placeholder="Find device or IP" aria-label="Find a device by name or IP address" autocomplete="off" spellcheck="false" aria-controls="findres" aria-expanded="false" title="Find a device (/)"><ul id="findres" role="listbox" aria-label="Matching devices" hidden></ul></div>
+  <div id="tools" role="group" aria-label="Canvas zoom"><button id="zin" aria-label="Zoom in" title="Zoom in (+)">+</button><button id="zout" aria-label="Zoom out" title="Zoom out (-)">−</button><button id="fit" title="Fit whole topology to the view (F)">Fit</button><button id="focus" title="Zoom to the traced path (Z)">Path</button></div></div>
   <div id="canvas"><div id="stage"><div class="empty">Loading topology…</div></div></div>
-  <div id="hint">Drag to pan, scroll to zoom (Ctrl/⌘+scroll on a stacked layout). <kbd>F</kbd> fits. Tab reaches devices, Enter selects.</div>
+  <div id="hint">Drag to pan, scroll to zoom (Ctrl/⌘+scroll on a stacked layout); zoom in for interfaces and addresses. <kbd>F</kbd> fits, <kbd>?</kbd> shows all keys.</div>
   <div id="pmview" class="pmbox"><div class="empty">Run a trace to see its path map.</div></div>
   <div id="busy" role="group" tabindex="-1" aria-label="Trace running"><div class="bx"><div class="brow"><div class="spin" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><span id="busytxt" role="status" aria-live="polite">Tracing…</span></div>
     <button id="cancel2" class="cancelbtn" type="button" title="Cancel the running trace (Esc)">Cancel trace (Esc)</button>
-    <div class="bnote">Cancel stops the trace before its next device or API request. A request already sent finishes first (bounded by its timeout), then the trace ends INCOMPLETE and keeps the hops found so far.</div></div></div>
+    <div class="bnote">Cancel stops before the next device or API request. A request already sent finishes first; the trace then ends INCOMPLETE and keeps the hops found so far.</div></div></div>
 </main>
 
 <section id="sim" aria-label="Packet flow and event list">
   <div id="simbar" role="toolbar" aria-label="Packet flow controls"><b>Playback</b>
     <button class="ctl" id="first" title="First (Home)" aria-label="First step"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3v10M12 3L7 8l5 5"/></svg></button><button class="ctl" id="prev" title="Back (←)" aria-label="Step back"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3L5 8l5 5"/></svg></button>
     <button class="ctl" id="play" title="Play / pause (Space)" aria-label="Play packet flow"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="i-play" d="M5.5 3.2l7 4.8-7 4.8z"/><path class="i-pause" d="M5.5 3.5v9M10.5 3.5v9"/></svg></button><button class="ctl" id="next" title="Step (→)" aria-label="Step forward"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg></button>
-    <button class="ctl" id="last" title="Last (End)" aria-label="Last step"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12 3v10M4 3l5 5-5 5"/></svg></button><button class="ctl" id="replay" title="Replay from source (R)" aria-label="Replay packet flow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3"/></svg>Replay</button>
+    <button class="ctl" id="last" title="Last (End)" aria-label="Last step"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12 3v10M4 3l5 5-5 5"/></svg></button><button class="ctl" id="replay" title="Replay from source (R)" aria-label="Replay packet flow"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3"/></svg><span class="t">Replay</span></button>
     <input type="range" id="scrub" min="0" max="0" value="0" step="1" aria-label="Position in the trace" disabled>
     <span id="stepinfo" role="status" aria-live="polite" title="no trace">no trace</span>
     <span class="sp"></span><label for="speed">Speed</label>
     <select id="speed" aria-label="Animation speed"><option value="0.5">0.5x</option><option value="1" selected>1x</option><option value="2">2x</option></select>
   </div>
   <div id="events"><div class="empty">Pick a scenario on the left or enter a flow above. Each hop is listed here in path order, and the packet moves across the topology as you step.</div></div>
-  <div id="kbhint"><kbd>Space</kbd> play / pause · <kbd>←</kbd> <kbd>→</kbd> step · <kbd>Home</kbd> <kbd>End</kbd> first / last · <kbd>R</kbd> replay · <kbd>F</kbd> fit · <kbd>Z</kbd> zoom to path</div>
 </section>
 
 <aside id="insp" aria-label="Inspector">
+  <button type="button" class="ctl" id="inspclose" aria-label="Hide inspector" title="Hide inspector"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
   <div id="summary"><span class="empty" style="padding:0">No trace selected.</span></div>
-  <div id="itabs" role="group" aria-label="Inspector view"><button data-tab="hop" aria-pressed="true">Hop</button><button data-tab="device" aria-pressed="false">Device</button><button data-tab="pm" aria-pressed="false">Path map</button><button data-tab="json" aria-pressed="false">JSON</button></div>
+  <div id="itabs" role="group" aria-label="Inspector view"><button data-tab="hop" aria-pressed="true">Hop</button><button data-tab="device" aria-pressed="false">Device</button><button data-tab="json" aria-pressed="false">JSON</button></div>
   <div id="ipane" tabindex="-1"></div>
 </aside>
+<div class="split" id="split-l" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="left" aria-label="Resize the scenarios panel" title="Drag to resize. Double-click to reset."></div>
+<div class="split" id="split-r" role="separator" tabindex="0" aria-orientation="vertical" aria-controls="insp" aria-label="Resize the inspector panel" title="Drag to resize. Double-click to reset."></div>
+<div class="split" id="split-b" role="separator" tabindex="0" aria-orientation="horizontal" aria-controls="sim" aria-label="Resize the playback panel" title="Drag to resize. Double-click to reset."></div>
 <div id="err" role="alert" title="Click to dismiss"></div>
+<dialog id="help" aria-labelledby="helptitle">
+  <h2 id="helptitle">Legend and keyboard shortcuts</h2>
+  <h3>Status</h3>
+  <div class="legend">
+    <span><i class="g" style="color:var(--t-pass)" aria-hidden="true">✓</i>pass</span><span><i class="g" style="color:var(--t-block)" aria-hidden="true">✕</i>block</span>
+    <span><i class="g" style="color:var(--t-warn)" aria-hidden="true">!</i>warn</span><span><i class="g" style="color:var(--t-unk)" aria-hidden="true">?</i>unknown (unverified)</span>
+    <span><i class="g" style="color:var(--t-info)" aria-hidden="true">i</i>lookup / info</span>
+    <div class="lab" style="margin-top:6px">Blue marks what you can act on and neutral lookups; green, red, amber and violet are verdicts. Dotted teal line, opposite direction = return path (only with “Include return path”). Dashed grey link = tunnel (IPsec / GlobalProtect / service connection). Heavy grey link = TGW attachment. Unknown or warn hops are never shown as success.</div>
+  </div>
+  <h3>Keys</h3>
+  <dl class="keys">
+    <dt><kbd>Space</kbd></dt><dd>play / pause the packet flow</dd>
+    <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>step back / forward</dd>
+    <dt><kbd>Home</kbd> <kbd>End</kbd></dt><dd>first / last step</dd>
+    <dt><kbd>R</kbd></dt><dd>replay from the source</dd>
+    <dt><kbd>F</kbd> <kbd>Z</kbd></dt><dd>fit the topology / zoom to the traced path</dd>
+    <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>zoom in / out (zoom in for interfaces and addresses)</dd>
+    <dt><kbd>/</kbd></dt><dd>find a device by name or IP</dd>
+    <dt><kbd>?</kbd></dt><dd>this help</dd>
+    <dt><kbd>Esc</kbd></dt><dd>show the whole topology undimmed; close this help</dd>
+  </dl>
+  <div class="hfoot"><button type="button" id="helpclose">Close</button></div>
+</dialog>
 
 <script>
 "use strict";
@@ -372,24 +457,35 @@ function renderTopology(){
     s += `<g class="group"><rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="14" fill="${f}" stroke="${st}" stroke-width="1.2"${dash}/>
       <text x="${g.x + 14}" y="${g.y + 22}" fill="${tc}" style="font:600 12px system-ui,sans-serif">${esc(g.label)}</text></g>`;
   }
+  let tags = "";
   for (const l of T.links) {
     const a = S.nodes[l.a], b = S.nodes[l.b]; if (!a || !b) continue;
     const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len;
-    s += `<g class="link ${esc(l.kind || "eth")}" data-l="${esc(linkKey(l.a, l.b))}"><line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
-    if (l.a_if) s += `<text class="iflbl" x="${a.x + ux * 54}" y="${a.y + uy * 54 - 6}" text-anchor="middle">${esc(l.a_if)}</text>`;
-    if (l.b_if) s += `<text class="iflbl" x="${b.x - ux * 54}" y="${b.y - uy * 54 - 6}" text-anchor="middle">${esc(l.b_if)}</text>`;
+    s += `<g class="link ${esc(l.kind || "eth")}" data-l="${esc(linkKey(l.a, l.b))}"><line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/></g>`;
+    // Link labels go in a later layer (above the path overlay and the packet stream, below the devices), in a group that
+    // dims with its link. Link-end labels: interface name above the line, its address (zoomed in) just below it. They sit
+    // far enough out that links converging on one device keep their labels apart, and a link leaving downwards clears
+    // the device's own name and model lines.
+    tags += `<g class="link tags" data-l="${esc(linkKey(l.a, l.b))}">`;
+    const at = (n, dx, dy) => { let d = Math.min(88, len * 0.36); if (dy > 0.6) d = Math.max(d, Math.min(92, len * 0.5)); return [n.x + dx * d, n.y + dy * d]; };
+    for (const [n, dx, dy, name, ip] of [[a, ux, uy, l.a_if, l.a_ip], [b, -ux, -uy, l.b_if, l.b_ip]]) {
+      if (!name) continue;
+      const [x, y] = at(n, dx, dy);
+      tags += `<text class="iflbl lod-mid" x="${x}" y="${y - 6}" text-anchor="middle">${esc(name)}</text>`;
+      if (ip) tags += `<text class="ifip lod-near" x="${x}" y="${y + 12}" text-anchor="middle">${esc(ip)}</text>`;
+    }
     if (l.label) { const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, w = l.label.length * 5.9 + 14;
-      s += `<g class="lnklbl"><rect x="${mx - w / 2}" y="${my - 9}" width="${w}" height="18" rx="9"/><text x="${mx}" y="${my + 4}" text-anchor="middle">${esc(l.label)}</text></g>`; }
-    s += `</g>`;
+      tags += `<g class="lnklbl lod-mid"><rect x="${mx - w / 2}" y="${my - 9}" width="${w}" height="18" rx="9"/><text x="${mx}" y="${my + 4}" text-anchor="middle">${esc(l.label)}</text></g>`; }
+    tags += `</g>`;
   }
-  s += `<g id="ov"></g><g id="flow" pointer-events="none"></g>`;
+  s += `<g id="ov"></g><g id="flow" pointer-events="none"></g><g id="tags" pointer-events="none">${tags}</g>`;
   for (const n of T.nodes) {
     s += `<g class="node" data-node="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.label)}${n.sub ? ", " + esc(n.sub) : ""}" transform="translate(${n.x},${n.y})"><title>${esc(n.label)} — ${esc(n.sub || "")}</title>
       <rect class="ping" x="-35" y="-35" width="70" height="70" rx="16"/><rect class="ring" x="-35" y="-35" width="70" height="70" rx="16" style="display:none"/>
       <rect class="tile" x="-29" y="-29" width="58" height="58" rx="13"/>
       <g transform="scale(.86)">${I[n.kind] || I.generic}</g>
       <text class="lbl" y="47" text-anchor="middle">${esc(n.label)}</text>
-      <text class="sub" y="61" text-anchor="middle">${esc(n.sub || "")}</text><g class="mark"></g></g>`;
+      <text class="sub lod-mid" y="61" text-anchor="middle">${esc(n.sub || "")}</text><g class="mark"></g></g>`;
   }
   s += `</svg>`;
   $("#stage").innerHTML = s;
@@ -398,7 +494,15 @@ function renderTopology(){
 function nodeEl(id){ return document.querySelector(`#topo .node[data-node="${CSS.escape(id)}"]`); }
 
 /* ===== D. pan / zoom (wheel zoom yields to page scroll on the stacked layout) ===== */
-function apply(glide){ const st = $("#stage"); st.classList.toggle("glide", !!glide && !RM.matches); st.style.transform = `translate(${S.tx}px,${S.ty}px) scale(${S.scale})`; }
+// zoom scale at which more detail appears (see the .lod-* rules)
+const LOD_MID = 0.75, LOD_NEAR = 1.3;
+function apply(glide){
+  const st = $("#stage"); st.classList.toggle("glide", !!glide && !RM.matches); st.style.transform = `translate(${S.tx}px,${S.ty}px) scale(${S.scale})`;
+  const lod = S.scale >= LOD_NEAR ? "near" : S.scale >= LOD_MID ? "mid" : "far";
+  if (st.dataset.lod !== lod) st.dataset.lod = lod;
+  const z = (Math.round(S.scale * 20) / 20).toFixed(2);   // quantised, so wheel zooming does not restyle every label each frame
+  if (st.style.getPropertyValue("--z") !== z) st.style.setProperty("--z", z);
+}
 function fitBox(x0, y0, x1, y1, maxScale = 1.25, glide = true){
   const r = $("#canvas").getBoundingClientRect(), pad = 40;
   S.scale = Math.min((r.width - 2 * pad) / (x1 - x0), (r.height - 2 * pad - 30) / (y1 - y0), maxScale);
@@ -419,16 +523,17 @@ function zoomAt(mx, my, k, glide){
   const ns = Math.min(3, Math.max(0.2, S.scale * k));
   S.tx = mx - (mx - S.tx) * ns / S.scale; S.ty = my - (my - S.ty) * ns / S.scale; S.scale = ns; apply(glide);
 }
-function zoomCentre(k){ const r = $("#canvas").getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, k, true); }
+function zoomCentre(k){ hideHint(); const r = $("#canvas").getBoundingClientRect(); zoomAt(r.width / 2, r.height / 2, k, true); }
+function hideHint(){ $("#hint").classList.add("gone"); }
 function bindCanvas(){
   const c = $("#canvas"); let drag = null, moved = false;
   c.addEventListener("mousedown", e => { drag = {x: e.clientX - S.tx, y: e.clientY - S.ty}; moved = false; c.classList.add("drag"); });
   addEventListener("mousemove", e => { if (!drag) return; const nx = e.clientX - drag.x, ny = e.clientY - drag.y;
-    if (Math.abs(nx - S.tx) + Math.abs(ny - S.ty) > 3) moved = true; S.tx = nx; S.ty = ny; apply(); });
+    if (Math.abs(nx - S.tx) + Math.abs(ny - S.ty) > 3) { moved = true; hideHint(); } S.tx = nx; S.ty = ny; apply(); });
   addEventListener("mouseup", () => { drag = null; c.classList.remove("drag"); });
   c.addEventListener("wheel", e => {
     if (STACKED.matches && !(e.ctrlKey || e.metaKey)) return;   // let the page scroll; Ctrl/⌘+wheel (or pinch) zooms
-    e.preventDefault(); const r = c.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.0015)); }, {passive: false});
+    e.preventDefault(); hideHint(); const r = c.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.0015)); }, {passive: false});
   c.addEventListener("click", e => { if (moved) return; const n = e.target.closest("#topo .node"); if (n) selectNode(n.dataset.node); });
   c.addEventListener("keydown", e => { const n = e.target.closest && e.target.closest("#topo .node");
     if (n && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); selectNode(n.dataset.node); } });
@@ -474,7 +579,8 @@ function verdictHtml(t, exitCode){
     : `<span><b>Stopped at</b>no hops recorded</span>`;
   return `<span class="vt"><span class="vi" aria-hidden="true">${esc(v.icon)}</span>${esc(name)}</span><div class="vm">${where}`
     + (t.Cancelled ? `<span><b>Cancelled</b>by user; the hops shown are those found before it stopped</span>` : "")
-    + `<span><b>Reason</b>${esc(t.Reason)}</span>` + symmetryLine(t) + `<span><b>Exit code</b>${esc(code)}: ${esc(v.meaning)}</span></div>`;
+    + `<span><b>Reason</b>${esc(t.Reason)}</span>` + symmetryLine(t) + `<span><b>Exit code</b>${esc(code)}: ${esc(v.meaning)}</span>`
+    + warnLink(t) + `</div>`;
 }
 // One tick per step, in path order: the shape of the whole result at a glance. Glyph + colour, and each tick jumps to its step.
 function stripHtml(){
@@ -488,13 +594,27 @@ function stripHtml(){
   });
   return `<div id="vstrip" role="group" aria-label="Every hop, in path order">${s}</div>`;
 }
+// Trace warnings live in the verdict band (the inspector may be hidden): a count that expands into the list.
+function warnLink(t){
+  const n = (t.Warnings || []).length; if (!n) return "";
+  return `<span><button type="button" class="lnk warnlnk" data-warn aria-expanded="false" aria-controls="vwarn"><span aria-hidden="true">!</span> ${n} warning${n > 1 ? "s" : ""}</button></span>`;
+}
+function warnList(t){
+  const w = (t.Warnings || []).map(x => `<li>${esc(x)}</li>`).join("");
+  return w ? `<ul class="vwarn" id="vwarn" aria-label="Warnings" hidden>${w}</ul>` : "";
+}
 function renderVerdict(t, exitCode){
   const v = $("#verdict"), cls = effectiveVerdict(t).cls;
-  v.className = `on V-${cls}`; v.innerHTML = verdictHtml(t, exitCode) + stripHtml();
+  v.className = `on V-${cls}`; v.innerHTML = verdictHtml(t, exitCode) + stripHtml() + warnList(t);
 }
-function jumpToHop(idx){ const i = S.steps.findIndex(s => s.hop && String(s.hop.index) === String(idx)); if (i >= 0) { stop(); goto(i); } }
+document.addEventListener("click", e => { const b = e.target.closest("[data-warn]"); if (!b) return;
+  const open = b.getAttribute("aria-expanded") !== "true", l = $("#vwarn"); b.setAttribute("aria-expanded", String(open)); if (l) l.hidden = !open; });
+function jumpToHop(idx){ const i = S.steps.findIndex(s => s.hop && String(s.hop.index) === String(idx)); if (i >= 0) pickStep(i); }
+// A step the user clicked (event row, verdict tick, "stopped at" link, path-map hop): open the inspector on the Hop tab if it
+// was hidden, then show the step. Playback, the step buttons, arrow keys and the scrubber never open it.
+function pickStep(i){ stop(); if (showInspector()) setTab("hop"); goto(i); }
 document.addEventListener("click", e => { const b = e.target.closest("[data-gohop]"); if (b) jumpToHop(b.dataset.gohop); });
-document.addEventListener("click", e => { const b = e.target.closest("[data-gostep]"); if (b) { stop(); goto(+b.dataset.gostep); } });
+document.addEventListener("click", e => { const b = e.target.closest("[data-gostep]"); if (b) pickStep(+b.dataset.gostep); });
 
 /* ===== F. trace form: validation, running state, remembered values (memory only) ===== */
 const TOKEN_RE = /^[A-Za-z0-9._@\\-]{1,64}$/;
@@ -528,6 +648,7 @@ function setRunning(on){
   $("#cancel").hidden = !on; S.cancelling = false; $$(".cancelbtn").forEach(b => b.disabled = false);
   $("#busytxt").textContent = on ? (S.boot.mode === "demo" ? "Tracing through the simulated lab…"
     : "Tracing, querying devices (read-only). The server stops a trace at its timeout (120 s by default) or when you cancel.") : "";
+  $("#swap").disabled = on;
   if (on) $("#cancel2").focus(); else if (document.activeElement === document.body) $("#run").focus();
 }
 // run id: random, in memory only, 25 characters of [a-z0-9]; the server uses it to find the trace to cancel
@@ -535,13 +656,75 @@ function newRunId(){ const a = new Uint8Array(12); crypto.getRandomValues(a); re
 async function runFlow(body){
   if (S.running) return;
   const id = S.runId = newRunId();
-  setRunning(true);
+  setRunning(true); liveStart(body); pollProgress(id);
   try { const e = await api("/api/trace", {...body, id}); loadEntry(e); refreshHistory(); }
-  catch (err) { toast(err.message); }
+  catch (err) { toast(err.message); liveAbort(); }
   finally { if (S.runId === id) S.runId = null; setRunning(false);
     // a scenario card started this run: give focus back to it (it was disabled while running), so arrow keys keep working
     const back = S.returnTo; S.returnTo = null; const a = document.activeElement;
     if (back && back.isConnected && (!a || a === document.body || a.matches("#run, .cancelbtn"))) back.focus(); }
+}
+// ---- live progress: while /api/trace is pending, poll /api/trace/progress and show each hop as the engine decides it,
+// in the hop list and as a ring on the topology. The final result (loadEntry) then replaces all of it.
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function pollProgress(id){
+  let since = 0;
+  while (S.running && S.runId === id) {
+    await sleep(250);
+    if (!S.running || S.runId !== id) break;
+    let r;
+    try { r = await api("/api/trace/progress", {id, since}); } catch (e) { if (e.status === 404 && since === 0) continue; break; }
+    if (S.runId !== id) break;   // the result arrived while this request was out
+    since = r.next; r.events.forEach(liveEvent);
+  }
+}
+function clearMarks(){
+  stop(); S.fl = null; $("#flow").replaceChildren(); $("#ov").innerHTML = "";
+  $$("#topo .node").forEach(n => { n.classList.remove("st-PASS", "st-BLOCK", "st-WARN", "st-UNKNOWN", "st-INFO", "cur", "probe");
+    n.querySelector(".ring").style.display = "none"; n.querySelector(".mark").innerHTML = ""; });
+}
+function liveStart(body){
+  S.live = {n: 1, ends: 0, probe: null, body};
+  clearMarks(); dimOffPath(false);
+  $("#events").innerHTML = `<table aria-label="Hops found so far"><colgroup><col style="width:30px"><col style="width:36px"><col style="width:96px"><col style="width:150px"><col></colgroup>
+    <tr><th><span class="sr">Details</span></th><th>#</th><th>Status</th><th>At</th><th>What happened</th></tr><tbody id="livebody">${liveSource(body.src)}</tbody>
+    <tr class="livewait"><td></td><td></td><td colspan="3">Locating the source…</td></tr></table>`;
+}
+// the engine's first hop is always "where the source lives": shown at once, so live numbers match the final list
+function liveSource(ip){ return `<tr class="live"><td></td><td>1</td><td>${badge("INFO")}</td><td>${esc(ip)}</td><td>source</td></tr>`; }
+function liveAbort(){ $("#events tr.livewait") && ($("#events tr.livewait").remove()); if (S.entry && S.k >= 0) { drawOverlay(S.k); dimOffPath(true); } }
+function nodeFor(name){
+  if (!name || !S.topo) return null;
+  if (S.nodes[name]) return name;
+  const n = S.topo.nodes.find(x => (x.devices || []).includes(name) || (x.ids || []).includes(name) || (x.vpcs || []).includes(name));
+  return n ? n.id : null;
+}
+function setProbe(id){
+  if (S.live.probe) { const o = nodeEl(S.live.probe); if (o) o.classList.remove("probe"); }
+  S.live.probe = id; const el = id && nodeEl(id); if (el) el.classList.add("probe");
+}
+function liveEvent(ev){
+  if (!S.live) return;
+  const wait = $("#events tr.livewait td:last-child");
+  if (ev.event === "progress") { const t = String(ev.text || ""); $("#busytxt").textContent = t.charAt(0).toUpperCase() + t.slice(1) + "…"; if (wait) wait.textContent = $("#busytxt").textContent; }
+  else if (ev.event === "step_start") { const words = String(ev.position || ""), last = words.split(" ").pop(), id = nodeFor(last);
+    setProbe(id); $("#busytxt").textContent = `Asking ${id ? S.nodes[id].label : last}…`; }
+  else if (ev.event === "end") { S.live.ends++; setProbe(null); if (wait) wait.textContent = "Tracing the return path…"; }
+  else if (ev.event === "hops") {
+    const body = $("#livebody"); if (!body) return;
+    if (S.live.ends > 0 && !S.live.retDiv) { S.live.retDiv = true; S.live.n++;
+      body.insertAdjacentHTML("beforeend", `<tr class="rdiv"><td colspan="5"><span aria-hidden="true">↩</span> Return path</td></tr>` + liveSource(S.live.body.dst).replace("<td>1</td>", `<td>${esc(S.live.n)}</td>`)); }
+    for (const h of ev.hops || []) {
+      const id = nodeFor(h.node), n = id && S.nodes[id];
+      body.insertAdjacentHTML("beforeend", `<tr class="live"><td></td><td>${esc(++S.live.n)}</td><td>${badge(h.status)}</td><td title="${esc(h.node)}">${esc(n ? n.label : h.node)}</td><td>${esc(h.component)}</td></tr>`);
+      const el = id && nodeEl(id);
+      if (el && SEV[h.status] !== undefined) {
+        const cur = ["BLOCK", "UNKNOWN", "WARN", "PASS", "INFO"].find(st => el.classList.contains("st-" + st));
+        if (!cur || SEV[h.status] > SEV[cur]) { if (cur) el.classList.remove("st-" + cur); el.classList.add("st-" + h.status); el.querySelector(".ring").style.display = ""; }
+      }
+    }
+    const box = $("#events"); box.scrollTop = box.scrollHeight;
+  }
 }
 // Cancel is cooperative: the server stops the trace before its next request. The /api/trace call then returns the
 // INCOMPLETE result (reason "cancelled by user") with the hops found so far, and the verdict banner announces it.
@@ -583,12 +766,14 @@ function bindForm(){
 }
 bindForm();
 $("#cancel").addEventListener("click", cancelRun);
+$("#swap").addEventListener("click", () => { const a = $("#f-src"), b = $("#f-dst"); [a.value, b.value] = [b.value, a.value];
+  if (a.value) S.touched.add("src"); if (b.value) S.touched.add("dst"); validateForm(false); });
 $("#cancel2").addEventListener("click", cancelRun);
 $("#busy").addEventListener("keydown", e => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cancelRun(); } });
 
 /* ===== G. trace loading ===== */
 function loadEntry(entry, opts = {}){
-  stop(); S.entry = entry;
+  stop(); S.live = null; if (S.topo) clearMarks(); S.entry = entry;
   const t = entry.trace, ov = entry.overlay;
   const rov = entry.return_overlay, ret = t.Return;
   S.hn = {...ov.hop_nodes, ...(rov ? rov.hop_nodes : {})};   // hop numbers are unique across both directions
@@ -849,8 +1034,8 @@ function renderEvents(){
   if (t.Return && nF === S.steps.length) s += returnDivider(t);   // return not run: the divider still says why
   $("#events").innerHTML = s + "</table>";
   $$("#events tr.ev").forEach((r, i) => {
-    r.onclick = () => { stop(); goto(i); };
-    r.onkeydown = e => { if (e.target === r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); stop(); goto(i); } };
+    r.onclick = () => pickStep(i);
+    r.onkeydown = e => { if (e.target === r && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); pickStep(i); } };
   });
   $$("#events .xbtn").forEach(b => b.onclick = e => { e.stopPropagation(); toggleDetail(b); });
 }
@@ -873,11 +1058,10 @@ function renderPane(){
   p.classList.toggle("pmtab", S.tab === "pm"); p.classList.remove("devtab");
   if (S.tab === "hop") p.innerHTML = S.hopHtml || `<p class="empty">Step through a trace to inspect each hop: the decision, policy, NAT and the raw read-only requests behind it.</p>`;
   else if (S.tab === "device") renderDevice();
-  else if (S.tab === "pm") { p.innerHTML = S.entry ? `<div class="pmbox" id="pmi">${S.entry.map_svg}</div><p class="lab">Click a device, SG/NACL badge or link to jump to that hop.${S.entry.trace.Return ? " This map shows the forward path only." : ""}</p>` : `<p class="empty">No trace yet. Run one to see its path map.</p>`; bindPathMap(p); fitPm($("#pmi")); centerPathMap(curHopIndex(), $("#pmi")); }
   else if (S.tab === "json") p.innerHTML = S.entry ? `<pre style="max-height:none">${esc(JSON.stringify(S.entry.trace, null, 2))}</pre>` : `<p class="empty">No trace yet.</p>`;
 }
 function bindPathMap(root){ root.querySelectorAll("[data-hop]").forEach(el => el.addEventListener("click", () => {
-  const i = S.steps.findIndex(s => s.hop && String(s.hop.index) === el.dataset.hop); if (i >= 0) { stop(); goto(i); setTab("hop"); } })); }
+  const i = S.steps.findIndex(s => s.hop && String(s.hop.index) === el.dataset.hop); if (i >= 0) { pickStep(i); setTab("hop"); } })); }
 function selectHop(idx, switchTab = true){
   const h = allHops().find(x => x.index == idx); if (!h) return;
   const nid = S.hn[String(idx)], n = S.nodes[nid];
@@ -906,10 +1090,33 @@ function showFinal(){ const t = S.entry.trace, back = dirOf(S.k) === "r", ov = b
 document.addEventListener("click", e => { const a = e.target.closest("a[data-node]"); if (a) { e.preventDefault(); selectNode(a.dataset.node); } });
 
 function selectNode(id){
+  const opened = showInspector();
   S.sel = id; $$("#topo .node").forEach(n => n.classList.toggle("sel", n.dataset.node === id)); setTab("device");
   if (S.entry) { const c = highlightHopsAt(id), n = S.nodes[id];
     if (n) setStepInfo(c ? `${n.label}: ${c} hop${c > 1 ? "s" : ""} in this trace` : `${n.label}: not on this path`); }
+  if (opened) keepNodeInView(id);
 }
+// ---- inspector visibility. Opening it narrows the canvas: the camera shifts by half the lost width (the view keeps its
+// centre), and a clicked device is panned back into view if it ended up under the panel.
+const inspOpen = () => !document.body.classList.contains("noinsp");
+function setInspector(open){
+  if (open === inspOpen()) return false;
+  const before = $("#canvas").clientWidth;
+  document.body.classList.toggle("noinsp", !open);
+  const ins = $("#insp"); ins.classList.remove("enter"); if (open) { void ins.offsetWidth; ins.classList.add("enter"); }
+  S.tx += ($("#canvas").clientWidth - before) / 2; apply(true);
+  clampPanels(); refitPm();
+  return true;
+}
+function showInspector(){ return setInspector(true); }
+function keepNodeInView(id){
+  const n = S.nodes[id], c = $("#canvas"); if (!n || !c) return;
+  const pad = 90, x = S.tx + n.x * S.scale, y = S.ty + n.y * S.scale;
+  const dx = x < pad ? pad - x : x > c.clientWidth - pad ? c.clientWidth - pad - x : 0;
+  const dy = y < pad ? pad - y : y > c.clientHeight - pad ? c.clientHeight - pad - y : 0;
+  if (dx || dy) { S.tx += dx; S.ty += dy; apply(true); }
+}
+$("#inspclose").addEventListener("click", () => { if (setInspector(false)) $("#ws").focus(); });
 
 /* ===== K. device pane + read-only console ===== */
 const CISCO_ALLOWED = ["show ip route [A.B.C.D]", "show ip cef A.B.C.D", "show ip arp [A.B.C.D]", "show ip interface brief",
@@ -946,6 +1153,12 @@ function deviceFacts(n, dev){
     ["AWS ids", (n.ids || []).join(", ")], ["VPC", (n.vpcs || []).join(", ")]];
   if (dev) f.push(["platform", dev.platform], ["reached", dev.via === "panorama" ? `via Panorama · inventory serial ${dev.serial} (HA follows the active member)` : (dev.host || "")], ["site", dev.site || ""]);
   return f.filter(x => x[1]).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+}
+// interface addresses known for this device (discovery cache and static addresses; nothing is queried)
+function deviceAddrs(n){
+  if (!(n.addrs || []).length) return "";
+  return `<b>Interfaces</b><dl class="kv addrl">` + n.addrs.map(r => `<dt>${esc(r.if || "(static)")}</dt><dd>${esc(r.ip)}</dd>`).join("")
+    + `</dl>` + (n.addrs_more ? `<p class="lab">+${esc(n.addrs_more)} more not shown</p>` : "");
 }
 function deviceHops(n){
   if (!S.entry) return ""; const hn = S.hn, here = allHops().filter(h => hn[String(h.index)] === n.id);
@@ -985,7 +1198,7 @@ function renderDevice(){
   const devName = (n.devices || []).find(d => S.boot.devices[d]), dev = devName ? S.boot.devices[devName] : null;
   const prompt = dev ? (dev.platform === "cisco_iosxe" ? `${devName}#` : `admin@${devName}>`) : "";
   let html = `<div class="devhead"><svg viewBox="-30 -30 60 60" aria-hidden="true">${S.boot.icons[n.kind] || S.boot.icons.generic}</svg><div><h3>${esc(n.label)}</h3><div class="lab">${esc(n.sub || "")}</div></div></div>
-    <dl class="kv">${deviceFacts(n, dev)}</dl>${deviceHops(n)}`;
+    <dl class="kv">${deviceFacts(n, dev)}</dl>${deviceAddrs(n)}${deviceHops(n)}`;
   if (dev) { const [top, bottom] = consoleHtml(devName, dev, prompt, S.console[devName] || (S.console[devName] = {lines: [], hist: [], hi: 0}));
     html = `<div class="devscroll">${html}${top}</div>${bottom}`; p.classList.add("devtab"); }
   else if (n.kind !== "external") html += `<div class="note">${n.vpcs || n.ids ? "AWS components have no console: Norn reads them with Describe/Search API calls during a trace. Each hop's evidence shows the exact calls." : "This node represents addresses, not a managed device."}</div>`;
@@ -1009,20 +1222,34 @@ function renderLeft(){
     + `<div class="s">${esc(p.flow.src)} → ${esc(p.flow.dst)}:${esc(p.flow.port ?? "")}/${esc(p.flow.protocol)}${p.flow.return ? " + return path" : ""}</div>`
     + `<div class="x">${esc(EXPECT_TEXT[p.expect] || "Expect " + String(p.expect).toLowerCase())}</div></button>`).join("");
   $$("#presets .preset").forEach(el => el.onclick = () => { S.returnTo = el; runPreset(el.dataset.id); });
-  syncPresetTab();
+  const kinds = ["REACHABLE", "BLOCKED", "EXITED", "INCOMPLETE"].filter(k => ps.some(p => p.expect === k));
+  $("#pfilter").innerHTML = kinds.length > 1 ? `<button type="button" data-f="" aria-pressed="true">All</button>` + kinds.map(k =>
+    `<button type="button" data-f="${esc(k)}" aria-pressed="false"><span class="g og ${esc(k)}" aria-hidden="true">${esc(OGLYPH[k])}</span>${esc(FILTER_TEXT[k])}</button>`).join("") : "";
+  $$("#pfilter button").forEach(bt => bt.onclick = () => filterPresets(bt.dataset.f));
+  filterPresets("");
   const sel = $("#f-start"); Object.keys(b.devices).forEach(d => { const o = document.createElement("option"); o.value = d; o.textContent = d; sel.appendChild(o); });
 }
+const FILTER_TEXT = {REACHABLE:"Reachable", BLOCKED:"Blocked", EXITED:"Exited", INCOMPLETE:"Unverified"};
+function filterPresets(kind){
+  setPressed("#pfilter button", "f", kind);
+  const ps = $$("#presets .preset"); ps.forEach(p => p.hidden = !!kind && !p.classList.contains(kind));
+  const shown = ps.filter(p => !p.hidden).length;
+  $("#presetcount").textContent = kind ? `(${shown} of ${ps.length})` : `(${ps.length})`;
+  syncPresetTab();
+}
+$("#presettoggle").addEventListener("click", () => { const b = $("#presettoggle"), open = b.getAttribute("aria-expanded") !== "true";
+  b.setAttribute("aria-expanded", String(open)); $("#presetbody").hidden = !open; b.querySelector(".ch").textContent = open ? "▾" : "▸"; });
 // About-this-lab toggle: open until the first trace has loaded, then collapsed (unless the user chose a state themselves)
 function setLab(open, byUser){ if (byUser) S.labTouched = true; $("#labinfo").hidden = !open; $("#labtoggle").setAttribute("aria-expanded", String(open)); $("#labtoggle .ch").textContent = open ? "▾" : "▸"; }
 $("#labtoggle").addEventListener("click", () => setLab($("#labtoggle").getAttribute("aria-expanded") !== "true", true));
 // Scenario cards behave as one group: a single Tab stop (the selected card, else the first), arrow keys move between cards.
-function syncPresetTab(){ const ps = $$("#presets .preset"), on = ps.find(p => p.classList.contains("on")) || ps[0]; ps.forEach(p => p.tabIndex = p === on ? 0 : -1); }
+function syncPresetTab(){ const all = $$("#presets .preset"), ps = all.filter(p => !p.hidden), on = ps.find(p => p.classList.contains("on")) || ps[0]; all.forEach(p => p.tabIndex = p === on ? 0 : -1); }
 $("#presets").addEventListener("keydown", e => {
-  const ps = $$("#presets .preset"), i = ps.indexOf(document.activeElement); if (i < 0) return;
+  const ps = $$("#presets .preset").filter(p => !p.hidden), i = ps.indexOf(document.activeElement); if (i < 0) return;
   const to = {ArrowDown: i + 1, ArrowRight: i + 1, ArrowUp: i - 1, ArrowLeft: i - 1, Home: 0, End: ps.length - 1}[e.key];
   if (to === undefined) return;
   e.preventDefault(); e.stopPropagation();   // arrows move between cards here; they do not step the trace
-  const t = ps[Math.max(0, Math.min(ps.length - 1, to))]; ps.forEach(p => p.tabIndex = p === t ? 0 : -1); t.focus();
+  const t = ps[Math.max(0, Math.min(ps.length - 1, to))]; $$("#presets .preset").forEach(p => p.tabIndex = p === t ? 0 : -1); t.focus();
 });
 async function refreshHistory(){
   const h = await api("/api/traces").catch(() => []);
@@ -1033,7 +1260,7 @@ async function refreshHistory(){
 
 /* ===== M. view switching + keyboard + startup ===== */
 function setView(v){ S.view = v; setPressed("#tabs .tab", "view", v);
-  $("#pmview").style.display = v === "pm" ? "flex" : "none"; $("#canvas").style.display = v === "topo" ? "" : "none"; $("#tools").style.display = v === "topo" ? "" : "none"; $("#hint").style.display = v === "topo" ? "" : "none";
+  $("#pmview").style.display = v === "pm" ? "flex" : "none"; $("#canvas").style.display = v === "topo" ? "" : "none"; $("#canvasbar").style.display = v === "topo" ? "" : "none"; $("#hint").style.display = v === "topo" ? "" : "none";
   if (v === "pm") { fitPm($("#pmview")); if (S.steps && S.steps.length) centerPathMap(curHopIndex(), $("#pmview")); } }
 $$("#tabs .tab").forEach(t => t.onclick = () => setView(t.dataset.view));
 $$("#itabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
@@ -1050,6 +1277,58 @@ RM.addEventListener("change", rmSync); rmSync();
 $("#fit").onclick = () => fit(); $("#focus").onclick = () => focusPath(); $("#zin").onclick = () => zoomCentre(1.25); $("#zout").onclick = () => zoomCentre(0.8);
 addEventListener("resize", () => { S.entry ? focusPath(false) : fit(false); refitPm(); });
 if (window.ResizeObserver) { const ro = new ResizeObserver(refitPm); ro.observe($("#pmview")); ro.observe($("#ipane")); }
+
+/* ===== N. panel resizing (memory only: sizes reset on reload, no storage APIs) =====
+   Each handle sets one CSS variable on <body> (--lw, --rw, --bh) that the grid reads. The canvas always keeps at least
+   MIN_CENTER px of width and MIN_CANVAS px of height, so a panel can never squeeze the topology away. */
+const MIN_CENTER = 360, MIN_CANVAS = 180;
+const SPLITS = {
+  "split-l": {v: "--lw", el: "#left", axis: "x", sign: 1, min: 200, max: () => innerWidth - $("#insp").offsetWidth - MIN_CENTER},
+  "split-r": {v: "--rw", el: "#insp", axis: "x", sign: -1, min: 280, max: () => innerWidth - $("#left").offsetWidth - MIN_CENTER},
+  "split-b": {v: "--bh", el: "#sim", axis: "y", sign: -1, min: 120, max: () => $("#ws").offsetHeight + $("#sim").offsetHeight - MIN_CANVAS},
+};
+function panelSize(sp){ const r = $(sp.el).getBoundingClientRect(); return Math.round(sp.axis === "x" ? r.width : r.height); }
+function setPanel(id, px){
+  const sp = SPLITS[id], v = Math.round(Math.max(sp.min, Math.min(Math.max(sp.min, sp.max()), px)));
+  document.body.style.setProperty(sp.v, v + "px"); syncSplit(id); return v;
+}
+function resetPanel(id){ document.body.style.removeProperty(SPLITS[id].v); clampPanels(); syncSplit(id); }
+// re-apply the limits to every panel the user has sized (after a reset or a window resize the room may have shrunk)
+function clampPanels(){ for (const id of Object.keys(SPLITS)) if (document.body.style.getPropertyValue(SPLITS[id].v)) setPanel(id, panelSize(SPLITS[id])); }
+function syncSplit(id){
+  const sp = SPLITS[id], h = document.getElementById(id);
+  h.setAttribute("aria-valuemin", sp.min); h.setAttribute("aria-valuemax", Math.max(sp.min, Math.round(sp.max())));
+  h.setAttribute("aria-valuenow", panelSize(sp));
+}
+for (const id of Object.keys(SPLITS)) {
+  const h = document.getElementById(id), sp = SPLITS[id];
+  h.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    e.preventDefault(); h.setPointerCapture(e.pointerId);
+    const start = sp.axis === "x" ? e.clientX : e.clientY, from = panelSize(sp);
+    h.classList.add("drag"); document.body.classList.add("resizing"); document.body.classList.toggle("rows", sp.axis === "y");
+    const move = ev => setPanel(id, from + sp.sign * ((sp.axis === "x" ? ev.clientX : ev.clientY) - start));
+    const end = () => { h.classList.remove("drag"); document.body.classList.remove("resizing", "rows");
+      h.removeEventListener("pointermove", move); h.removeEventListener("pointerup", end); h.removeEventListener("pointercancel", end); };
+    h.addEventListener("pointermove", move); h.addEventListener("pointerup", end); h.addEventListener("pointercancel", end);
+  });
+  h.addEventListener("dblclick", () => resetPanel(id));
+  // Keyboard: arrows move the edge (Shift = bigger steps), Home/End = smallest/largest, Enter = reset. The keys never reach
+  // the global trace shortcuts while a handle has focus.
+  h.addEventListener("keydown", e => {
+    const step = e.shiftKey ? 64 : 16, cur = panelSize(sp);
+    const grow = sp.axis === "x" ? (sp.sign > 0 ? "ArrowRight" : "ArrowLeft") : "ArrowUp";
+    const shrink = sp.axis === "x" ? (sp.sign > 0 ? "ArrowLeft" : "ArrowRight") : "ArrowDown";
+    let done = true;
+    if (e.key === grow) setPanel(id, cur + step); else if (e.key === shrink) setPanel(id, cur - step);
+    else if (e.key === "Home") setPanel(id, sp.min); else if (e.key === "End") setPanel(id, sp.max());
+    else if (e.key === "Enter") resetPanel(id); else done = false;
+    if (done || ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", " "].includes(e.key)) { e.preventDefault(); e.stopPropagation(); }
+  });
+  h.addEventListener("focus", () => syncSplit(id));
+}
+// a smaller window must not leave a panel wider than the room it has
+addEventListener("resize", clampPanels);
 // Global shortcuts. Controls that own Space/Enter (buttons, links, rows, nodes, inputs) keep them.
 addEventListener("keydown", e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -1062,7 +1341,79 @@ addEventListener("keydown", e => {
   else if (e.key === "f" || e.key === "F") fit(); else if (e.key === "z" || e.key === "Z") focusPath();
   else if (e.key === "+" || e.key === "=") zoomCentre(1.25); else if (e.key === "-") zoomCentre(0.8);
   else if (e.key === "Escape") dimOffPath(false);
+  else if (e.key === "/") { e.preventDefault(); $("#find").focus(); $("#find").select(); }
+  else if (e.key === "?") { e.preventDefault(); openHelp(); }
 });
+function openHelp(){ const d = $("#help"); if (!d.open) d.showModal(); }
+$("#helpbtn").addEventListener("click", openHelp);
+$("#helpclose").addEventListener("click", () => $("#help").close());
+$("#help").addEventListener("click", e => { if (e.target === $("#help")) $("#help").close(); });   // a click on the backdrop
+$("#help").addEventListener("keydown", e => e.stopPropagation());   // its keys never step the trace
+
+/* ===== O. find a device: by name, AWS id, interface or IP (an address it owns, or the prefix it stands for) ===== */
+function ip4(s){ const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s); if (!m) return null;
+  const o = m.slice(1).map(Number); return o.some(x => x > 255) ? null : ((o[0] << 24) >>> 0) + (o[1] << 16) + (o[2] << 8) + o[3]; }
+function inCidr(ip, cidr){ const [net, bits] = String(cidr).split("/"), n = ip4(net), b = +bits; if (n === null || !(b >= 0 && b <= 32)) return false;
+  const mask = b === 0 ? 0 : (0xffffffff << (32 - b)) >>> 0; return ((ip & mask) >>> 0) === ((n & mask) >>> 0); }
+function findNodes(q){
+  q = q.trim(); if (!q || !S.topo) return [];
+  const ip = ip4(q), low = q.toLowerCase(), out = [];
+  for (const n of S.topo.nodes) {
+    let score = 0, why = "";
+    if (ip !== null) {
+      const a = (n.addrs || []).find(r => r.ip === q);
+      if (a) { score = 100; why = `${a.if ? a.if + " " : ""}${a.ip}`; }
+      else { const c = (n.cidrs || []).filter(x => inCidr(ip, x)).sort((x, y) => +y.split("/")[1] - +x.split("/")[1])[0];
+        if (c) { score = 10 + +c.split("/")[1]; why = `in ${c}`; } }
+    } else {
+      const hay = [[n.label, ""], [n.id, ""], [n.sub, ""], ...(n.devices || []).map(d => [d, "device"]), ...(n.ids || []).map(d => [d, ""]),
+                   ...(n.addrs || []).map(r => [r.if, r.ip])];
+      for (const [text, extra] of hay) { if (!text) continue; const t = String(text).toLowerCase();
+        const sc = t === low ? 90 : t.startsWith(low) ? 70 : t.includes(low) ? 40 : 0;
+        if (sc > score) { score = sc; why = extra && extra !== "device" ? `${text} ${extra}` : text === n.label ? (n.sub || "") : String(text); } }
+    }
+    if (score) out.push({n, score, why});
+  }
+  // the default route (0.0.0.0/0) contains every address: list it only when nothing more specific matched
+  const specific = out.filter(h => h.why !== "in 0.0.0.0/0");
+  return (specific.length ? specific : out).sort((a, b) => b.score - a.score || a.n.label.localeCompare(b.n.label)).slice(0, 8);
+}
+function renderFind(){
+  const box = $("#findres"), q = $("#find").value, hits = findNodes(q);
+  S.findHits = hits; S.findSel = 0;
+  if (!q.trim()) { box.hidden = true; $("#find").setAttribute("aria-expanded", "false"); return; }
+  box.innerHTML = hits.length ? hits.map((h, i) => `<li role="option" id="fr-${i}" data-n="${esc(h.n.id)}" aria-selected="${i === 0}">${esc(h.n.label)}<span class="why">${esc(h.why)}</span></li>`).join("")
+    : `<li class="none" role="option" aria-disabled="true">No device matches</li>`;
+  box.hidden = false; $("#find").setAttribute("aria-expanded", "true");
+  $("#find").setAttribute("aria-activedescendant", hits.length ? "fr-0" : "");
+}
+function moveFind(d){
+  const items = $$("#findres li[data-n]"); if (!items.length) return;
+  S.findSel = (S.findSel + d + items.length) % items.length;
+  items.forEach((li, i) => li.setAttribute("aria-selected", String(i === S.findSel)));
+  $("#find").setAttribute("aria-activedescendant", `fr-${S.findSel}`);
+}
+// Centre the device, zoom in far enough to show its interfaces, highlight it and give it keyboard focus (Enter then opens
+// it in the inspector, like a click). Finding does not open the inspector by itself.
+function goToNode(id){
+  const n = S.nodes[id], c = $("#canvas"); if (!n) return;
+  $("#findres").hidden = true; $("#find").setAttribute("aria-expanded", "false"); hideHint();
+  if (S.view !== "topo") setView("topo");
+  const k = Math.max(S.scale, LOD_NEAR + 0.05); S.scale = k; S.tx = c.clientWidth / 2 - n.x * k; S.ty = c.clientHeight / 2 - n.y * k; apply(true);
+  $$("#topo .node.found").forEach(x => x.classList.remove("found"));
+  const el = nodeEl(id); if (el) { void el.getBoundingClientRect(); el.classList.add("found"); el.focus({preventScroll: true}); }
+}
+$("#find").addEventListener("input", renderFind);
+$("#find").addEventListener("focus", () => { if ($("#find").value.trim()) renderFind(); });
+$("#find").addEventListener("keydown", e => {
+  e.stopPropagation();
+  if (e.key === "ArrowDown") { e.preventDefault(); moveFind(1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); moveFind(-1); }
+  else if (e.key === "Enter") { e.preventDefault(); const h = (S.findHits || [])[S.findSel || 0]; if (h) goToNode(h.n.id); }
+  else if (e.key === "Escape") { e.preventDefault(); if ($("#find").value) { $("#find").value = ""; renderFind(); } else $("#find").blur(); }
+});
+$("#findres").addEventListener("mousedown", e => { const li = e.target.closest("li[data-n]"); if (li) { e.preventDefault(); goToNode(li.dataset.n); } });
+$("#find").addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== $("#find")) { $("#findres").hidden = true; $("#find").setAttribute("aria-expanded", "false"); } }, 120));
 // Scroll only the hop list, never the page (scrollIntoView also scrolls the window on the stacked layout and hid the form),
 // and keep the row clear of the sticky header.
 function revealRow(row, mode){
@@ -1080,7 +1431,8 @@ async function startup(){
   const h = HASH;
   if (h.get("preset")) {
     const p = S.boot.presets.find(x => x.id === h.get("preset"));
-    if (p) { fillForm(p.flow); try { const e = await api("/api/trace", {...p.flow, preset: p.id}); loadEntry(e, {step: h.get("step") || undefined, autoplay: !h.get("step")}); refreshHistory();
+    if (p) { fillForm(p.flow); try { const e = await api("/api/trace", {...p.flow, preset: p.id}); if (h.get("step")) { setInspector(true); $("#insp").classList.remove("enter"); }
+      loadEntry(e, {step: h.get("step") || undefined, autoplay: !h.get("step")}); refreshHistory();
       if (h.get("node")) selectNode(h.get("node")); } catch (err) { toast(err.message); } }
   } else if (h.get("trace")) { try { loadEntry(await api("/api/traces/" + encodeURIComponent(h.get("trace"))), {autoplay: false, step: "last", fillForm: true}); } catch (e) { toast("That trace is no longer available (the server was restarted). Run a new one."); } }
   else if (S.boot.presets.length) fillForm(S.boot.presets[0].flow);

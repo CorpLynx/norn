@@ -61,6 +61,36 @@ def return_flow(fwd: TraceResult) -> tuple[Flow, list[str]]:
     return flow, notes
 
 
+def stateful_reply_enis(fwd: TraceResult) -> dict[str, int]:
+    """ENIs whose security groups the reply passes because they passed the request (D16, amended 2026-11-14).
+
+    AWS security groups are stateful per ENI: a response to traffic a group allowed is allowed whatever the rules say.
+    That is documented AWS behaviour, not a session-table guess, but it holds only when the reply at that ENI is the
+    exact reverse of what the group saw. So only the two endpoints count, and only when the forward hops prove it:
+    - the source ENI: the security-group egress PASS before the first route lookup (no NAT can happen before it);
+    - the destination ENI: the ingress PASS on the ENI the trace delivered to, and only without source NAT (with SNAT
+      the reply really goes to the translated address, which the return trace does not follow).
+    Returns {eni_id: forward hop index}. Anything else on the return path is evaluated as a new session, as before."""
+    out: dict[str, int] = {}
+    if fwd.outcome != Outcome.REACHABLE:
+        return out
+    for h in fwd.hops:
+        if h.domain != "aws":
+            continue
+        if h.component == "route-table":
+            break
+        if h.component == "security-group" and h.status == Status.PASS and h.egress:
+            out[h.egress] = h.index
+    last = fwd.hops[-1] if fwd.hops else None
+    seen = fwd.final_flow or fwd.flow
+    if last is not None and last.domain == "aws" and last.component == "eni" and last.status == Status.PASS \
+            and seen.src == fwd.flow.src:
+        sg = next((h for h in reversed(fwd.hops[:-1]) if h.domain == "aws" and h.component == "security-group"), None)
+        if sg is not None and sg.status == Status.PASS and sg.ingress == last.node:
+            out[last.node] = sg.index
+    return out
+
+
 def not_run(fwd: TraceResult, reason: str) -> ReturnPath:
     flow, _ = return_flow(fwd)
     return ReturnPath(flow=flow, outcome=None, reason=reason,
@@ -70,6 +100,11 @@ def not_run(fwd: TraceResult, reason: str) -> ReturnPath:
 def _element(h: Hop) -> tuple[str, str, str] | None:
     if h.domain in DEVICE_DOMAINS:
         return (h.domain, "", h.node)
+    if h.domain == "aws" and h.component == "tgw-route-table" and h.location.get("tgw"):
+        # A TGW picks the route table by the attachment traffic enters from, so a request and its reply normally use
+        # different tables of the same TGW. Compare the TGW and the attachments it uses (ingress/egress), not the
+        # table: a reply that leaves by another attachment (around an inspection VPC) still differs.
+        return (h.domain, "tgw", h.location["tgw"])
     if h.domain == "aws" and h.component in TRANSIT_COMPONENTS:
         return (h.domain, h.component, h.node)
     return None

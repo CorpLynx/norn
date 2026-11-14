@@ -49,7 +49,7 @@ Topology knowledge stays in the inventory and the engine.
 - `Hop`: domain, node, component, status, summary, ingress/egress, policy, nat, details[], evidence[].
 - `Status`: PASS, BLOCK, WARN (forwards but something is off, e.g. return path), UNKNOWN (couldn't
   evaluate), INFO (lookup step).
-- `Outcome`: REACHABLE, BLOCKED, EXITED (left known networks, e.g. internet or an unmanaged next hop),
+- `Outcome`: REACHABLE, BLOCKED, EXITED (left known networks: a declared `external` link, or a global next hop outside the inventory; an unknown internal next hop is INCOMPLETE, D19),
   INCOMPLETE. A REACHABLE or EXITED path that passed through any UNKNOWN hop is downgraded to
   INCOMPLETE by the engine (never guess).
 - Cancelling: `errors.CancelToken` (a `threading.Event` wrapper, no web concepts) is passed to `Tracer(cancel=...)`
@@ -60,7 +60,7 @@ Topology knowledge stays in the inventory and the engine.
   hops so far, without adding an UNKNOWN hop. `KeyboardInterrupt` in the engine loop is handled the same way, so
   CLI Ctrl-C exits 4 with partial hops. The web server owns the run-id -> token map (`App.runs`).
 - Return path (`Tracer.trace_with_return`, `symmetry.py`, since v0.4.x): optional second trace destination -> source on
-  the same `Tracer` (one `Deadline` and cancel token: the return trace gets what is left of the budget; the same
+  the same `Tracer` (one `Deadline` and cancel token: the return trace gets a fresh budget of the same length, D19; the same
   read-only clients; `check_return` is off for it because the return trace *is* that check). It runs only when the
   forward Outcome is REACHABLE. BLOCKED/INCOMPLETE: no established forward path to compare. EXITED: the destination is
   outside the networks nettrace knows, so the reverse trace would start from an address it cannot locate. These give

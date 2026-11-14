@@ -47,6 +47,7 @@ FILTER_PATHS = {
     "association.gateway-id": "Associations.GatewayId",
     "vpc-id": "VpcId",
     "transit-gateway-id": "TransitGatewayId",
+    "resource-type": "ResourceType",
     "state": "State",
 }
 
@@ -119,6 +120,11 @@ class Backend:
         target = (f.get("route-search.longest-prefix-match") or f.get("route-search.supernet-of-match") or [None])[0]
         if target is None:
             return copy.deepcopy(routes)
+        # As real AWS answers (checked 2026-11-14): longest-prefix-match takes a bare address and finds nothing
+        # for a CIDR such as 10.0.20.113/32; supernet-of-match takes a CIDR and finds nothing for a bare address.
+        # Both answer the wrong form with an empty list, not an error.
+        if ("route-search.longest-prefix-match" in f) == ("/" in target):
+            return []
         addr = ipaddress.ip_network(target, strict=False).network_address
         hits = [r for r in routes if addr in ipaddress.ip_network(r["DestinationCidrBlock"])]
         if "route-search.longest-prefix-match" in f and hits:

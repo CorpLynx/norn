@@ -75,7 +75,8 @@ and `--query` (JMESPath) accepted anywhere on the line.
    `AmbiguousEni`. A trace has an overall deadline (`errors.Deadline`, default 120 s, `trace_timeout` /
    `--timeout`); every new request path must call `deadline.check()` before it sends (it also raises `Cancelled`
    when the user cancels from the web UI or Ctrl-C; that ends INCOMPLETE "cancelled by user" with the hops so far). A trace with any UNKNOWN hop never ends
-   REACHABLE or EXITED: the engine downgrades it to INCOMPLETE (exit 4). Any driver exception becomes an UNKNOWN hop
+   REACHABLE or EXITED: the engine downgrades it to INCOMPLETE (exit 4). A next hop that is not in the inventory ends EXITED only if it is a global
+   address outside every inventory network; an internal or unparseable one is an UNKNOWN `next-hop` hop (D19). Any driver or egress-resolution exception becomes an UNKNOWN hop
    (hops so far are kept). Parser failures raise `DeviceError`; they never mean "no rows".
 4. **Credentials come from environment variables only.** The inventory names the variables
    (`*_env` keys) and never holds secrets. Never print credential values, including in
@@ -94,7 +95,9 @@ and `--query` (JMESPath) accepted anywhere on the line.
    (`HttpOnly; SameSite=Strict; Path=/`, session-only, no Domain/Max-Age) is issued by `GET /?c=<code>`, where the code is a
    separate one-time login code (60 s, single use, memory only). No route mints codes; restart for a new one. `POST /api/trace/cancel`
    `{id}` is one of those authenticated routes: it only sets a cooperative cancel flag (`CancelToken`) that the
-   engine checks beside the deadline; it never kills a thread, and it is audit-logged (`status=cancelled`). Don't add a
+   engine checks beside the deadline; it never kills a thread, and it is audit-logged (`status=cancelled`).
+   `POST /api/trace/progress` `{id, since}` (authenticated too) returns a running trace's hops so far (node, status,
+   component, progress text; no evidence) from `Tracer(on_event=...)`; it sends nothing to a device, so it is not audited. Don't add a
    `--host` option, CORS, or unauthenticated API routes. Console commands must keep going through
    `CiscoClient.show` / `PanosClient.request`, so the guards apply. `serve` opens the browser by default (`--no-open` only prints the URL; `--open` is a no-op alias)
    at `http://127.0.0.1:PORT/?c=<code>` via `launch_browser`, which drops
@@ -126,7 +129,9 @@ and `--query` (JMESPath) accepted anywhere on the line.
   - `nettrace demo serve` and `nettrace serve` (real inventory) start a localhost UI with a topology
     canvas, multi-packet flow animation (play/pause/step/replay/speed; stepping while paused keeps the stream frozen), event list, inspector and read-only device console.
   - `--demo` on any command runs it against the simulated Acme Corp lab (`src/nettrace/demo/`).
-  **It has never run against real devices, Panorama, Prisma Access or AWS accounts.**
+  **First live run 2026-11-14** (D20): AWS (four accounts, Transit Gateway, cross-account) and one VM-Series 11.1 reached
+  directly, against the aws-networking-lab; three bugs found and fixed. Still never run against Panorama, Prisma Access or
+  Cisco devices, PAN-OS advanced routing, or AWS load balancers / PrivateLink.
 - PAN-OS hops go **through Panorama** when the device has a `serial` and a `panorama:` section exists.
   Requests carry `target=<serial>`. Panorama also supplies HA state (passive members are redirected to
   the active peer) and device-group context. `via: direct` still talks straight to a firewall.
@@ -213,7 +218,10 @@ python3 -m venv .venv && .venv/bin/pip install -e .
   Forward BLOCKED/INCOMPLETE/EXITED skips it (Symmetry NOT_RUN). With a delivered forward path: return BLOCKED by a
   stateless hop -> exit 3, return INCOMPLETE or symmetry UNKNOWN -> 4, ASYMMETRIC -> 0 with a warning. A deny by a
   stateful hop (PAN-OS, Prisma, SG) on the return flow is INCOMPLETE, not BLOCKED: nettrace evaluates the return flow as a
-  new session and does not read session tables. UNKNOWN in either direction makes the symmetry UNKNOWN. The comparison
+  new session and does not read session tables. Exception (D20): the security groups of the forward source ENI, and of
+  the destination ENI when there was no source NAT, pass the reply as a recorded stateful PASS naming the forward hop
+  (`symmetry.stateful_reply_enis`), because AWS security groups are stateful per ENI. A TGW is compared by its
+  attachments, not its route tables. UNKNOWN in either direction makes the symmetry UNKNOWN. The comparison
   reads structured hop fields only (see `symmetry.py`); never parse summary text. Return hops are numbered after the
   forward hops. Audit records written during a `--return` trace carry `direction`: `forward` / `return`. The offline
   path map (`viz/`) is forward-only.

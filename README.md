@@ -76,17 +76,24 @@ so any source and destination you type gets a real answer, not just the presets.
   sites, accounts and VPCs.
 - **Simulation panel.** Run, play, pause, step and rewind; a stream of packets flows hop by hop across the
   topology (pause freezes it; stepping while paused keeps it frozen), as in Packet Tracer's simulation mode. The event list shows every hop with its status,
-  and off-path devices are dimmed.
-- **Inspector:**
+  and off-path devices are dimmed. While a trace runs, each hop appears in the list and lights up on the topology
+  as soon as the engine decides it.
+- **Topology detail.** Zoom in for more: device names when zoomed out, then model/subnet lines and interface
+  names, then interface addresses (from `nettrace inventory discover`). **Find** (or <kbd>/</kbd>) jumps to a device
+  by name, AWS id, interface or IP. The **Path map** view next to Topology shows the NetBrain-style map from `viz`.
+- **Verdict bar.** The outcome, where it stopped, the reason, the exit code, one tick per hop, and the trace's
+  warnings (click "N warnings").
+- **Inspector** (hidden until you click a device or a step; drag its edge to resize, × to hide):
   - **Hop** — the decision, policy, NAT, location, and every read-only request and answer;
-  - **Device** — device facts, the hops at that device in this trace, and a console;
-  - **Path map** — the NetBrain-style map from `viz`;
+  - **Device** — device facts, its interface addresses, the hops at that device in this trace, and a console;
   - **JSON** — the raw trace.
+- **Panels.** The left rail, inspector and playback panel resize from the edge they share with the topology.
+  <kbd>?</kbd> shows the legend and every keyboard shortcut.
 - **Device console.** Runs read-only commands on the device (simulated in the demo, real in live
   mode). The "try a write ✋" chip shows the read-only guard refusing `configure terminal` or a PAN-OS
   `<request>`.
 - **Scenarios and history.** 17 preset scenarios (3 of them trace the return path) with an expected outcome each (see
-  `nettrace demo scenarios`), plus a history of recent traces.
+  `nettrace demo scenarios`), filterable by outcome, plus a history of recent traces.
 - **Deep links.** `#preset=branch-smb&step=last&node=core-rtr1` opens a scenario at a given step
   with a node selected; `#trace=<id>` reopens a trace from history. These work after
   you are logged in; an old `#token=` in a link is ignored.

@@ -6,22 +6,23 @@ Section 2 lists functional gaps. Section 3 is the proposed order of work.
 
 ## 1. Unverified assumptions (check against live systems first)
 
-Nothing has run against real equipment yet. All behaviour was checked with mocks. Each item names the
-code that would change if the assumption is wrong.
+Until 2026-11-14 nothing had run against real equipment. That day Norn ran against the aws-networking-lab (four AWS
+accounts, a Transit Gateway, a VM-Series 11.1 reached directly): items marked **verified** held (or were fixed, see D20);
+everything else is still checked with mocks only. Each item names the code that would change if the assumption is wrong.
 
 | # | Assumption | Where | How to verify |
 |---|---|---|---|
-| V1 | A read-only PAN-OS admin role can run `test security-policy-match`, `test nat-policy-match` and `test routing fib-lookup` over the XML API | `drivers/panos.py` | `nettrace panos test-security-policy ...` with the read-only key |
+| V1 | **Verified 2026-11-14** (VM-Series 11.1, `via: direct`, role `superreader`): security-policy-match, nat-policy-match and fib-lookup all answered. A read-only PAN-OS admin role can run `test security-policy-match`, `test nat-policy-match` and `test routing fib-lookup` over the XML API | `drivers/panos.py` | `nettrace panos test-security-policy ...` with the read-only key |
 | V2 | `test advanced-routing fib-lookup` works over the API on the owner's PAN-OS versions. PAN's own Ansible collection skips it, citing missing API support | `PanosClient.fib_lookup` | run on an Advanced Routing firewall. Fallback: parse `<show><advanced-routing><route>` and do LPM locally |
-| V3 | fib-lookup XML has `interface`, `nh`, `ip`, `src` directly under `result` | `PanosClient.fib_lookup` | `--verbose` evidence |
-| V4 | `show interface all` returns `result/ifnet/entry` with `name`, `zone`, `fwd` (`vr:X`/`lr:X`), `ip` | `PanosClient.interfaces` | `--verbose` evidence |
+| V3 | **Verified 2026-11-14** (legacy routing). fib-lookup XML has `interface`, `nh`, `ip`, `src` directly under `result` | `PanosClient.fib_lookup` | `--verbose` evidence |
+| V4 | **Verified 2026-11-14.** `show interface all` returns `result/ifnet/entry` with `name`, `zone`, `fwd` (`vr:X`/`lr:X`), `ip` | `PanosClient.interfaces` | `--verbose` evidence |
 | V5 | NAT rule XPaths (local vsys rulebase, `/config/panorama/vsys/...` pre/post) find Panorama-pushed rules on the firewall | `PanosClient.rule_config` | run `panos test-nat-policy` on a Panorama-managed firewall |
 | V6 | Prisma Access is managed by Strata Cloud Manager, and folders are named `Mobile Users` / `Remote Networks` | `drivers/prisma.py`, inventory `prisma_access.*.folder` | ask the owner. If Panorama-managed, see R2 |
 | V7 | SCM returns rules in evaluation order and `position=pre/post` is complete (no inherited parent-folder rules missing) | `ScmClient.security_rules` | compare with the SCM UI rule order |
 | V8 | IOS-XE `show ip cef <ip>` output matches the parser (nexthop/attached/receive lines) on the owner's versions | `parse_cef` | `nettrace cisco show-route` |
-| V9 | `SearchTransitGatewayRoutes` with `route-search.longest-prefix-match` is accepted (fallback is `supernet-of-match`) | `AwsEnv.search_tgw_routes` | `nettrace aws search-tgw-routes` |
-| V10 | AssumeRole into every account works from the operator's base credentials | `AwsEnv.session` | `nettrace configure check --test-connections` |
-| V11 | Cross-account TGW (VPC owner ≠ TGW owner) works as coded. moto couldn't simulate it | `_to_tgw`, `_enter_vpc_from_tgw` | trace between two accounts that share a TGW |
+| V9 | **Refuted and fixed 2026-11-14 (D20):** longest-prefix-match needs a bare address; `/32` returned nothing. `SearchTransitGatewayRoutes` with `route-search.longest-prefix-match` is accepted (fallback is `supernet-of-match`) | `AwsEnv.search_tgw_routes` | `nettrace aws search-tgw-routes` |
+| V10 | **Verified 2026-11-14** (four accounts, external ID, session policy). AssumeRole into every account works from the operator's base credentials | `AwsEnv.session` | `nettrace configure check --test-connections` |
+| V11 | **Verified 2026-11-14** (TGW in the network account, VPCs in dev/prod/shared). Cross-account TGW (VPC owner ≠ TGW owner) works as coded. moto couldn't simulate it | `_to_tgw`, `_enter_vpc_from_tgw` | trace between two accounts that share a TGW |
 | V12 | Panorama proxies `test security-policy-match`, `test nat-policy-match` and `fib-lookup` with `target=<serial>` for a read-only Panorama admin. PAN documents `target` for op/config queries in general | `PanosClient.request` | `nettrace panos test-security-policy --device <serial-based device>` |
 | V13 | `show devices all` reports HA as `ha/state` (`active`/`passive`/`active-primary`/...) and `ha/peer/serial`. Taken from pan-os-python and go-panos parsers | `PanoramaClient.devices`, `resolve_target` | `nettrace panorama list-devices` on an HA pair |
 | V14 | `show devicegroups` → `devicegroups/entry[@name]/devices/entry[@name=serial]` and `show dg-hierarchy` → nested `<dg name>` (pan-os-python) | `PanoramaClient.devices`, `dg_parents` | `nettrace panorama show-device --device X` |

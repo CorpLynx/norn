@@ -95,14 +95,35 @@ class XmlApi:
         self.key_env = key_env
         self.timeout = timeout
         # Simulation seam (demo lab, tests): factory(XmlApi) -> object with .post(url, data, headers, timeout, allow_redirects).
-        self.session = XmlApi.session_override(self) if XmlApi.session_override else requests.Session()
-        self.session.verify = verify_tls
+        self._verify_tls = verify_tls
+        self._own_session: Any = None  # a requests.Session this class created (never a seam-provided one)
+        self.session = self._new_session()
         if verify_tls is False:
             log.warning("TLS certificate verification is DISABLED for %s: the API key is sent to %s without "
                         "checking the server identity. Set verify_tls to true or a CA bundle path.",
                         label, ", ".join(hosts))
         self._cache: dict[str, Any] = {}
         self.evidence: list[Evidence] = []
+
+    def _new_session(self) -> Any:
+        if XmlApi.session_override:
+            return XmlApi.session_override(self)  # owned by whoever installed the seam
+        self._own_session = requests.Session()
+        self._own_session.verify = self._verify_tls
+        return self._own_session
+
+    def close(self) -> None:
+        """Close the requests session this object created. Idempotent, never raises. A seam-provided or
+        replaced session is left alone. The next request lazily creates a fresh session."""
+        own, self._own_session = self._own_session, None
+        if own is None:
+            return
+        if self.session is own:
+            self.session = None
+        try:
+            own.close()
+        except Exception:  # noqa: BLE001
+            pass
 
     def request(self, params: dict[str, str], label: str, source: str | None = None) -> Any:
         who = source or self.label
@@ -130,6 +151,8 @@ class XmlApi:
         key = env_value(self.key_env, what=f"{self.label} API key")
         resp = None
         errors = []
+        if self.session is None:
+            self.session = self._new_session()
         for url in self.urls:  # second URL = Panorama HA peer
             for _attempt in (1, 2):  # one retry on a timeout; safe because check_panos_request allows reads only
                 if self.deadline:
@@ -180,12 +203,18 @@ class PanosClient:
         self.api = api or direct_api(device)
         self.target = target
         self.panorama = panorama
+        self._owns_api = api is None  # a Panorama-supplied api belongs to the PanoramaClient
         self.notes = list(notes or [])
         self.meta = dict(meta or {})  # serial / device_group, shown on the map
 
     @property
     def evidence(self) -> list[Evidence]:
         return self.api.evidence
+
+    def close(self) -> None:
+        """Close the API session if this client created it (not one shared from Panorama). Never raises."""
+        if self._owns_api:
+            self.api.close()
 
     def request(self, params: dict[str, str], label: str) -> Any:
         if self.device.vsys:
@@ -401,6 +430,9 @@ class PanoramaClient:
     @property
     def evidence(self) -> list[Evidence]:
         return self.api.evidence
+
+    def close(self) -> None:
+        self.api.close()
 
     def op(self, cmd: str) -> Any:
         return self.api.request({"type": "op", "cmd": cmd}, cmd)

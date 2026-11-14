@@ -11,6 +11,9 @@ Security model (it can drive read-only queries against real devices):
   Path=/ and has no Domain/Max-Age (a session cookie); no Secure flag because loopback is plain http;
 - Host header must be 127.0.0.1:<port> or localhost:<port> (blocks DNS rebinding);
 - POST bodies must be JSON and at most 64 KiB; Origin, when sent, must be this server;
+- POST /api/trace/progress {id, since} is authenticated like every other route; it returns the hops a running trace has
+  decided so far (node, status, component and a progress line: no evidence, nothing a device was sent). It sends nothing
+  to any device, so it is not audit-logged;
 - POST /api/trace/cancel {id} is authenticated like every other route; it only sets a cooperative cancel flag
   on a running trace (no thread is killed), and is audit-logged (mode=trace, status=cancelled);
 - device console commands still pass the same read-only guards as the CLI.
@@ -45,7 +48,7 @@ from nettrace.inventory import Inventory
 from nettrace.models import Flow, truncate
 from nettrace.netutil import PROTOCOL_NUMBERS
 from nettrace.output import exit_code
-from nettrace.web.topology import auto_topology, overlay
+from nettrace.web.topology import annotate_addresses, auto_topology, overlay
 
 MAX_BODY = 64 * 1024
 BODY_DEADLINE = 10.0  # seconds to receive a whole POST body (the socket timeout is per read; this is the total)
@@ -55,6 +58,7 @@ RUN_ID_RE = re.compile(r"[A-Za-z0-9_-]{8,64}")  # client-chosen id of a running 
 LOGIN_TTL = 60.0  # seconds the one-time login code stays valid
 COOKIE_NAME = "nettrace_session"
 CANCEL_RATE = (30, 10.0)  # at most 30 cancel calls per 10 s
+PROGRESS_MAX = 400  # events kept per running trace (a trace stops at max_hops; this only bounds a misbehaving one)
 TOKEN_RE = re.compile(r"[A-Za-z0-9._@\\\-]{1,64}")
 ICON_KINDS = ("router", "firewall", "prisma", "tgw", "vpc-router", "eni", "host", "endpoint", "igw", "external",
               "natgw", "gwlbe", "vpce", "error", "lan", "users", "account", "peering", "vgw", "exit", "generic")
@@ -79,11 +83,11 @@ class App:
         if demo:
             from nettrace.demo import lab
 
-            self.topology = lab.TOPOLOGY
+            self.topology = annotate_addresses(lab.TOPOLOGY, inv)
             self.presets = lab.PRESETS
             self.title = "Acme Corp demo lab"
         else:
-            self.topology = auto_topology(inv)
+            self.topology = annotate_addresses(auto_topology(inv), inv)
             self.presets = []
             self.title = str(inv.path)
         self.token = secrets.token_urlsafe(24)  # long-lived per-run session secret
@@ -95,6 +99,7 @@ class App:
         self.history_lock = threading.Lock()  # guards history (two trace threads write, the console/UI threads read)
         self.trace_slots = threading.BoundedSemaphore(2)
         self.runs_lock = threading.Lock()
+        self.progress: dict[str, list[dict[str, Any]]] = {}  # run id -> live events of a running trace (runs_lock)
         self.runs: dict[str, CancelToken] = {}  # running traces by run id
         self.cancelled_runs: OrderedDict[str, None] = OrderedDict()  # recently cancelled, so a repeat cancel is idempotent
         self._cancel_times: list[float] = []
@@ -166,18 +171,28 @@ class App:
             if run_id in self.runs:
                 raise BadRequest("id: a trace with this id is already running", HTTPStatus.CONFLICT)
             self.runs[run_id] = token
+            self.progress[run_id] = []
+
+        def record(event: dict[str, Any]) -> None:  # called from the trace thread; the UI polls /api/trace/progress
+            with self.runs_lock:
+                events = self.progress.get(run_id)
+                if events is not None and len(events) < PROGRESS_MAX:
+                    events.append(event)
+
         try:
             if not self.trace_slots.acquire(timeout=1):
                 raise BadRequest("another trace is running; try again in a moment", HTTPStatus.TOO_MANY_REQUESTS)
             try:
                 started = time.time()
-                tracer = Tracer(self.inv, cancel=token)
+                tracer = Tracer(self.inv, cancel=token, on_event=record,
+                                progress=lambda msg: record({"event": "progress", "text": msg}))
                 result = tracer.trace_with_return(flow, start_at=start_at) if with_return else tracer.trace(flow, start_at=start_at)
             finally:
                 self.trace_slots.release()
         finally:
             with self.runs_lock:
                 self.runs.pop(run_id, None)
+                self.progress.pop(run_id, None)
         trace = result.to_dict()
         port = f":{flow.dst_port}" if flow.dst_port else ""
         entry = {
@@ -202,6 +217,20 @@ class App:
             while len(self.history) > 50:
                 self.history.popitem(last=False)
         return entry
+
+    def trace_progress(self, body: dict[str, Any]) -> tuple[dict[str, Any], int]:
+        """Events a running trace has produced since index `since`. Unknown or finished id -> 404 (the /api/trace call
+        then returns, or has returned, the full result)."""
+        run_id, since = body.get("id"), body.get("since", 0)
+        if not isinstance(run_id, str) or not RUN_ID_RE.fullmatch(run_id):
+            raise BadRequest("id: 8-64 characters from A-Z a-z 0-9 _ -")
+        if not isinstance(since, int) or isinstance(since, bool) or since < 0:
+            raise BadRequest("since: a whole number >= 0")
+        with self.runs_lock:
+            events = self.progress.get(run_id)
+            if events is None:
+                return {"error": "no running trace with this id (unknown, or it already finished)"}, 404
+            return {"id": run_id, "events": events[since:], "next": len(events)}, 200
 
     def cancel_trace(self, body: dict[str, Any]) -> tuple[dict[str, Any], int]:
         """Ask a running trace to stop. The engine sees the flag before its next device/API request or hop, so a
@@ -539,6 +568,9 @@ def make_handler(app: App, port: int, verbose: bool) -> type[BaseHTTPRequestHand
                 body = self._body()
                 if self.path == "/api/trace":
                     self._json(app.run_trace(body))
+                elif self.path == "/api/trace/progress":
+                    data, status = app.trace_progress(body)
+                    self._json(data, status)
                 elif self.path == "/api/trace/cancel":
                     data, status = app.cancel_trace(body)
                     self._json(data, status)
