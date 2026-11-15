@@ -1,0 +1,50 @@
+[
+ {
+  "params": {
+   "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-ok/a19c8480d0322721"
+  },
+  "response": {
+   "TargetHealthDescriptions": [
+    {
+     "AdministrativeOverride": {
+      "Description": "No override is currently active on target",
+      "Reason": "AdministrativeOverride.NoOverride",
+      "State": "no_override"
+     },
+     "HealthCheckPort": "8080",
+     "Target": {
+      "Id": "i-071c9aa517b3ce5ac",
+      "Port": 8080
+     },
+     "TargetHealth": {
+      "State": "healthy"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-denied/a715133b3c5e47c8"
+  },
+  "response": {
+   "TargetHealthDescriptions": [
+    {
+     "AdministrativeOverride": {
+      "Description": "No override is currently active on target",
+      "Reason": "AdministrativeOverride.NoOverride",
+      "State": "no_override"
+     },
+     "HealthCheckPort": "8080",
+     "Target": {
+      "Id": "i-071c9aa517b3ce5ac",
+      "Port": 8081
+     },
+     "TargetHealth": {
+      "State": "healthy"
+     }
+    }
+   ]
+  }
+ }
+]

@@ -1,0 +1,236 @@
+[
+ {
+  "params": {
+   "GroupIds": [
+    "sg-033ad8304882aca14"
+   ]
+  },
+  "response": {
+   "SecurityGroups": [
+    {
+     "Description": "Managed by Terraform",
+     "GroupId": "sg-033ad8304882aca14",
+     "GroupName": "norn-probe-client",
+     "IpPermissions": [],
+     "IpPermissionsEgress": [
+      {
+       "IpProtocol": "-1",
+       "IpRanges": [
+        {
+         "CidrIp": "0.0.0.0/0"
+        }
+       ],
+       "Ipv6Ranges": [],
+       "PrefixListIds": [],
+       "UserIdGroupPairs": []
+      }
+     ],
+     "OwnerId": "111122223333",
+     "SecurityGroupArn": "arn:aws:ec2:us-east-1:111122223333:security-group/sg-033ad8304882aca14",
+     "Tags": [
+      {
+       "Key": "purpose",
+       "Value": "norn-privatelink-probe"
+      }
+     ],
+     "VpcId": "vpc-0b02caebeed10552b"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "GroupIds": [
+    "sg-067ed97cc5261164a"
+   ]
+  },
+  "response": {
+   "SecurityGroups": [
+    {
+     "Description": "Managed by Terraform",
+     "GroupId": "sg-067ed97cc5261164a",
+     "GroupName": "norn-probe-endpoint",
+     "IpPermissions": [
+      {
+       "FromPort": 80,
+       "IpProtocol": "tcp",
+       "IpRanges": [
+        {
+         "CidrIp": "10.241.0.0/24"
+        }
+       ],
+       "Ipv6Ranges": [],
+       "PrefixListIds": [],
+       "ToPort": 82,
+       "UserIdGroupPairs": []
+      }
+     ],
+     "IpPermissionsEgress": [],
+     "OwnerId": "111122223333",
+     "SecurityGroupArn": "arn:aws:ec2:us-east-1:111122223333:security-group/sg-067ed97cc5261164a",
+     "Tags": [
+      {
+       "Key": "purpose",
+       "Value": "norn-privatelink-probe"
+      }
+     ],
+     "VpcId": "vpc-0b02caebeed10552b"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "GroupIds": [
+    "sg-09226e072a33a19a0"
+   ]
+  },
+  "response": {
+   "SecurityGroups": [
+    {
+     "Description": "Managed by Terraform",
+     "GroupId": "sg-09226e072a33a19a0",
+     "GroupName": "norn-probe-nlb",
+     "IpPermissions": [
+      {
+       "FromPort": 80,
+       "IpProtocol": "tcp",
+       "IpRanges": [
+        {
+         "CidrIp": "10.241.0.0/24"
+        },
+        {
+         "CidrIp": "10.240.0.0/24"
+        }
+       ],
+       "Ipv6Ranges": [],
+       "PrefixListIds": [],
+       "ToPort": 82,
+       "UserIdGroupPairs": []
+      }
+     ],
+     "IpPermissionsEgress": [
+      {
+       "FromPort": 8080,
+       "IpProtocol": "tcp",
+       "IpRanges": [
+        {
+         "CidrIp": "10.240.0.0/24"
+        }
+       ],
+       "Ipv6Ranges": [],
+       "PrefixListIds": [],
+       "ToPort": 8081,
+       "UserIdGroupPairs": []
+      }
+     ],
+     "OwnerId": "111122223333",
+     "SecurityGroupArn": "arn:aws:ec2:us-east-1:111122223333:security-group/sg-09226e072a33a19a0",
+     "Tags": [
+      {
+       "Key": "purpose",
+       "Value": "norn-privatelink-probe"
+      }
+     ],
+     "VpcId": "vpc-043d60068398555af"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "GroupIds": [
+    "sg-0249b0b99bf276f8c"
+   ]
+  },
+  "response": {
+   "SecurityGroups": [
+    {
+     "Description": "Managed by Terraform",
+     "GroupId": "sg-0249b0b99bf276f8c",
+     "GroupName": "norn-probe-target",
+     "IpPermissions": [
+      {
+       "FromPort": 8080,
+       "IpProtocol": "tcp",
+       "IpRanges": [],
+       "Ipv6Ranges": [],
+       "PrefixListIds": [],
+       "ToPort": 8080,
+       "UserIdGroupPairs": [
+        {
+         "GroupId": "sg-09226e072a33a19a0",
+         "UserId": "111122223333"
+        }
+       ]
+      }
+     ],
+     "IpPermissionsEgress": [
+      {
+       "IpProtocol": "-1",
+       "IpRanges": [
+        {
+         "CidrIp": "10.240.0.0/24"
+        }
+       ],
+       "Ipv6Ranges": [],
+       "PrefixListIds": [],
+       "UserIdGroupPairs": []
+      }
+     ],
+     "OwnerId": "111122223333",
+     "SecurityGroupArn": "arn:aws:ec2:us-east-1:111122223333:security-group/sg-0249b0b99bf276f8c",
+     "Tags": [
+      {
+       "Key": "purpose",
+       "Value": "norn-privatelink-probe"
+      }
+     ],
+     "VpcId": "vpc-043d60068398555af"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "GroupIds": [
+    "sg-08a949f0ff60f19ac"
+   ]
+  },
+  "response": {
+   "SecurityGroups": [
+    {
+     "Description": "Managed by Terraform",
+     "GroupId": "sg-08a949f0ff60f19ac",
+     "GroupName": "norn-probe-src",
+     "IpPermissions": [],
+     "IpPermissionsEgress": [
+      {
+       "IpProtocol": "-1",
+       "IpRanges": [
+        {
+         "CidrIp": "10.241.0.0/24"
+        },
+        {
+         "CidrIp": "10.240.0.0/24"
+        }
+       ],
+       "Ipv6Ranges": [],
+       "PrefixListIds": [],
+       "UserIdGroupPairs": []
+      }
+     ],
+     "OwnerId": "111122223333",
+     "SecurityGroupArn": "arn:aws:ec2:us-east-1:111122223333:security-group/sg-08a949f0ff60f19ac",
+     "Tags": [
+      {
+       "Key": "purpose",
+       "Value": "norn-privatelink-probe"
+      }
+     ],
+     "VpcId": "vpc-043d60068398555af"
+    }
+   ]
+  }
+ }
+]

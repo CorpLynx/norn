@@ -1,0 +1,62 @@
+[
+ {
+  "params": {
+   "TargetGroupArns": [
+    "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-ok/a19c8480d0322721"
+   ]
+  },
+  "response": {
+   "TargetGroups": [
+    {
+     "HealthCheckEnabled": true,
+     "HealthCheckIntervalSeconds": 30,
+     "HealthCheckPort": "8080",
+     "HealthCheckProtocol": "TCP",
+     "HealthCheckTimeoutSeconds": 10,
+     "HealthyThresholdCount": 3,
+     "IpAddressType": "ipv4",
+     "LoadBalancerArns": [
+      "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/0ee921ee073cc5f5"
+     ],
+     "Port": 8080,
+     "Protocol": "TCP",
+     "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-ok/a19c8480d0322721",
+     "TargetGroupName": "tg-ok",
+     "TargetType": "instance",
+     "UnhealthyThresholdCount": 3,
+     "VpcId": "vpc-043d60068398555af"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "TargetGroupArns": [
+    "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-denied/a715133b3c5e47c8"
+   ]
+  },
+  "response": {
+   "TargetGroups": [
+    {
+     "HealthCheckEnabled": true,
+     "HealthCheckIntervalSeconds": 30,
+     "HealthCheckPort": "8080",
+     "HealthCheckProtocol": "TCP",
+     "HealthCheckTimeoutSeconds": 10,
+     "HealthyThresholdCount": 3,
+     "IpAddressType": "ipv4",
+     "LoadBalancerArns": [
+      "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/0ee921ee073cc5f5"
+     ],
+     "Port": 8081,
+     "Protocol": "TCP",
+     "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-denied/a715133b3c5e47c8",
+     "TargetGroupName": "tg-denied",
+     "TargetType": "instance",
+     "UnhealthyThresholdCount": 3,
+     "VpcId": "vpc-043d60068398555af"
+    }
+   ]
+  }
+ }
+]

@@ -144,7 +144,8 @@ def test_simulator_answers_like_the_elbv2_api() -> None:
     env = aws.AwsEnv(install())
     lb = env.call(ELB, REGION, "describe_load_balancers", service="elbv2", LoadBalancerArns=[lab.NLB_ARN])["LoadBalancers"][0]
     assert lb["Type"] == "network" and lb["Scheme"] == "internal"
-    assert lb["AvailabilityZones"][0]["LoadBalancerAddresses"][0]["PrivateIPv4Address"] == lab.NLB_TOOLS_IP
+    # live AWS leaves the addresses empty for an internal NLB without static IPs (the node is its ENI)
+    assert lb["AvailabilityZones"][0]["LoadBalancerAddresses"] == []
     th = env.call(ELB, REGION, "describe_target_health", service="elbv2", TargetGroupArn=lab.TG_ARN)["TargetHealthDescriptions"]
     assert th[0]["Target"] == {"Id": lab.TOOLS01_INSTANCE, "Port": 8443} and th[0]["TargetHealth"]["State"] == "healthy"
     # visibility mirrors AWS: another account does not see the load balancer

@@ -1,0 +1,126 @@
+[
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "association.subnet-id",
+     "Values": [
+      "subnet-0d08a2211b2ef5518"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "RouteTables": []
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "vpc-id",
+     "Values": [
+      "vpc-0b02caebeed10552b"
+     ]
+    },
+    {
+     "Name": "association.main",
+     "Values": [
+      "true"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "RouteTables": [
+    {
+     "Associations": [
+      {
+       "AssociationState": {
+        "State": "associated"
+       },
+       "Main": true,
+       "RouteTableAssociationId": "rtbassoc-08f306265d5a94b77",
+       "RouteTableId": "rtb-0735b7c057ee62a0d"
+      }
+     ],
+     "OwnerId": "111122223333",
+     "PropagatingVgws": [],
+     "RouteTableId": "rtb-0735b7c057ee62a0d",
+     "Routes": [
+      {
+       "DestinationCidrBlock": "10.241.0.0/24",
+       "GatewayId": "local",
+       "Origin": "CreateRouteTable",
+       "State": "active"
+      }
+     ],
+     "Tags": [],
+     "VpcId": "vpc-0b02caebeed10552b"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "association.subnet-id",
+     "Values": [
+      "subnet-05545a1a52651626d"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "RouteTables": []
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "vpc-id",
+     "Values": [
+      "vpc-043d60068398555af"
+     ]
+    },
+    {
+     "Name": "association.main",
+     "Values": [
+      "true"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "RouteTables": [
+    {
+     "Associations": [
+      {
+       "AssociationState": {
+        "State": "associated"
+       },
+       "Main": true,
+       "RouteTableAssociationId": "rtbassoc-0bda62ae17d9f49d6",
+       "RouteTableId": "rtb-0a5a44c9f392475bf"
+      }
+     ],
+     "OwnerId": "111122223333",
+     "PropagatingVgws": [],
+     "RouteTableId": "rtb-0a5a44c9f392475bf",
+     "Routes": [
+      {
+       "DestinationCidrBlock": "10.240.0.0/24",
+       "GatewayId": "local",
+       "Origin": "CreateRouteTable",
+       "State": "active"
+      }
+     ],
+     "Tags": [],
+     "VpcId": "vpc-043d60068398555af"
+    }
+   ]
+  }
+ }
+]

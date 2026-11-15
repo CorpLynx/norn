@@ -1,0 +1,57 @@
+[
+ {
+  "params": {
+   "LoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/0ee921ee073cc5f5"
+  },
+  "response": {
+   "Listeners": [
+    {
+     "DefaultActions": [
+      {
+       "ForwardConfig": {
+        "TargetGroupStickinessConfig": {
+         "Enabled": false
+        },
+        "TargetGroups": [
+         {
+          "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-ok/a19c8480d0322721"
+         }
+        ]
+       },
+       "Order": 1,
+       "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-ok/a19c8480d0322721",
+       "Type": "forward"
+      }
+     ],
+     "ListenerArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:listener/net/norn-probe-nlb/0ee921ee073cc5f5/6ba2328d7fba81b4",
+     "LoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/0ee921ee073cc5f5",
+     "Port": 80,
+     "Protocol": "TCP"
+    },
+    {
+     "DefaultActions": [
+      {
+       "ForwardConfig": {
+        "TargetGroupStickinessConfig": {
+         "Enabled": false
+        },
+        "TargetGroups": [
+         {
+          "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-denied/a715133b3c5e47c8"
+         }
+        ]
+       },
+       "Order": 1,
+       "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-denied/a715133b3c5e47c8",
+       "Type": "forward"
+      }
+     ],
+     "ListenerArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:listener/net/norn-probe-nlb/0ee921ee073cc5f5/73e2452c06236245",
+     "LoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/0ee921ee073cc5f5",
+     "Port": 82,
+     "Protocol": "TCP"
+    }
+   ]
+  }
+ }
+]

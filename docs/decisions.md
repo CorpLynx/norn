@@ -43,6 +43,21 @@ the NLB ARNs). Reachability Analyzer and Network Access Analyzer are still not u
     follows the first target and WARNs. No registered target is a BLOCK.
   - Cross-zone: with it off a node sends only to targets in its own zone; a target in another zone is a WARN (and says if the NLB
     has no subnet there). The setting is the target group's `load_balancing.cross_zone.enabled`, else the NLB's attribute.
+- **Checked live (2026-11-15, throwaway probe in one account, us-east-1; fixtures in `tests/fixtures/aws_live/privatelink/`,
+  replayed by `tests/test_aws_live_privatelink.py`).** Confirmed: ENI `InterfaceType` `vpc_endpoint` / `network_load_balancer` and
+  the descriptions `VPC Endpoint Interface vpce-...` / `ELB net/<name>/<id>`; `DescribeVpcEndpointServices` `Owner` (account id
+  string) and `ServiceId`; `DescribeVpcEndpointServiceConfigurations` `NetworkLoadBalancerArns` and `ServiceState` `Available`;
+  `EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic` is present on the load balancer and is `on` for an NLB with security
+  groups; `preserve_client_ip.enabled` is present in the target group attributes and is `true` by default for instance targets;
+  the listener, target group and target health shapes; the flows REACHABLE (port 80), BLOCKED no listener (81), BLOCKED by the
+  target's security group (82), `--return` NOT_RUN for PrivateLink. **Wrong, fixed:** `AvailabilityZones[].LoadBalancerAddresses`
+  is an empty list for an internal NLB without static private IPs, so the node address was never found and every PrivateLink
+  trace ended INCOMPLETE. The node is now the NLB's own ENI in the endpoint's subnet (found by `subnet-id` and the `ELB net/<name>/`
+  description; ambiguous or none is UNKNOWN); `LoadBalancerAddresses` is still used when AWS reports it. The demo lab and
+  simulator now answer the empty list too. **Not verifiable without sending traffic** (no packets were sent): which source address
+  the NLB's inbound rules and the target's security group see for PrivateLink traffic (the code assumes the endpoint ENI address
+  for the NLB's rules and the node for the target's), and a direct trace to a node with preservation on blocks when the target
+  security group only allows the NLB's security group (preserved client address is judged; matches the documentation).
 - **Never guess, here.** Several NLBs behind a service, several weighted target groups, several targets: follow the first, WARN
   listing all (hop status WARN, `warnings`), same as TGW ECMP. An owner account outside the inventory, a gateway load balancer
   service, an `alb`/`lambda` target group, an IP target outside the VPC (`AvailabilityZone` `all`), a non-TCP/UDP protocol, no

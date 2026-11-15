@@ -1,0 +1,65 @@
+[
+ {
+  "params": {
+   "VpcEndpointIds": [
+    "vpce-06cd448cb2f85fa57"
+   ]
+  },
+  "response": {
+   "VpcEndpoints": [
+    {
+     "CreationTimestamp": "2026-11-15 13:29:02.465000+00:00",
+     "DnsEntries": [
+      {
+       "DnsName": "vpce-06cd448cb2f85fa57-5vqjgve2.vpce-svc-0283315b65cb4a056.us-east-1.vpce.amazonaws.com",
+       "HostedZoneId": "Z7HUB22UULQXV"
+      },
+      {
+       "DnsName": "vpce-06cd448cb2f85fa57-5vqjgve2-us-east-1c.vpce-svc-0283315b65cb4a056.us-east-1.vpce.amazonaws.com",
+       "HostedZoneId": "Z7HUB22UULQXV"
+      },
+      {
+       "DnsName": "vpce-06cd448cb2f85fa57-5vqjgve2-us-east-1d.vpce-svc-0283315b65cb4a056.us-east-1.vpce.amazonaws.com",
+       "HostedZoneId": "Z7HUB22UULQXV"
+      }
+     ],
+     "DnsOptions": {
+      "DnsRecordIpType": "ipv4"
+     },
+     "Groups": [
+      {
+       "GroupId": "sg-067ed97cc5261164a",
+       "GroupName": "norn-probe-endpoint"
+      }
+     ],
+     "IpAddressType": "ipv4",
+     "NetworkInterfaceIds": [
+      "eni-0bbc7e8f705bea0c2",
+      "eni-0bee48fb15f08c0b7"
+     ],
+     "OwnerId": "111122223333",
+     "PolicyDocument": "{\n  \"Statement\": [\n    {\n      \"Action\": \"*\",\n      \"Effect\": \"Allow\",\n      \"Principal\": \"*\",\n      \"Resource\": \"*\"\n    }\n  ]\n}",
+     "PrivateDnsEnabled": false,
+     "RequesterManaged": false,
+     "RouteTableIds": [],
+     "ServiceName": "com.amazonaws.vpce.us-east-1.vpce-svc-0283315b65cb4a056",
+     "ServiceRegion": "us-east-1",
+     "State": "available",
+     "SubnetIds": [
+      "subnet-0d08a2211b2ef5518",
+      "subnet-0de03f414cd50ac5b"
+     ],
+     "Tags": [
+      {
+       "Key": "purpose",
+       "Value": "norn-privatelink-probe"
+      }
+     ],
+     "VpcEndpointId": "vpce-06cd448cb2f85fa57",
+     "VpcEndpointType": "Interface",
+     "VpcId": "vpc-0b02caebeed10552b"
+    }
+   ]
+  }
+ }
+]

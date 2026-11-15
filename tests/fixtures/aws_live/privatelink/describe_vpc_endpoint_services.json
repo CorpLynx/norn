@@ -1,0 +1,50 @@
+[
+ {
+  "params": {
+   "ServiceNames": [
+    "com.amazonaws.vpce.us-east-1.vpce-svc-0283315b65cb4a056"
+   ]
+  },
+  "response": {
+   "ServiceDetails": [
+    {
+     "AcceptanceRequired": false,
+     "AvailabilityZoneIds": [
+      "use1-az1",
+      "use1-az2"
+     ],
+     "AvailabilityZones": [
+      "us-east-1c",
+      "us-east-1d"
+     ],
+     "BaseEndpointDnsNames": [
+      "vpce-svc-0283315b65cb4a056.us-east-1.vpce.amazonaws.com"
+     ],
+     "ManagesVpcEndpoints": false,
+     "Owner": "111122223333",
+     "ServiceId": "vpce-svc-0283315b65cb4a056",
+     "ServiceName": "com.amazonaws.vpce.us-east-1.vpce-svc-0283315b65cb4a056",
+     "ServiceRegion": "us-east-1",
+     "ServiceType": [
+      {
+       "ServiceType": "Interface"
+      }
+     ],
+     "SupportedIpAddressTypes": [
+      "ipv4"
+     ],
+     "Tags": [
+      {
+       "Key": "purpose",
+       "Value": "norn-privatelink-probe"
+      }
+     ],
+     "VpcEndpointPolicySupported": false
+    }
+   ],
+   "ServiceNames": [
+    "com.amazonaws.vpce.us-east-1.vpce-svc-0283315b65cb4a056"
+   ]
+  }
+ }
+]

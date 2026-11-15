@@ -1027,12 +1027,22 @@ class AwsWalker:
             if zone is None and zones:
                 zone = zones[0]
                 warn.append(f"the NLB has no subnet in the endpoint's zone {ep_az}; used its node in {zone.get('ZoneName')}")
+            # Live AWS leaves LoadBalancerAddresses empty for an internal NLB without static private IPs, so the
+            # node is its ENI in that zone's subnet (description "ELB net/<name>/<id>"), found by subnet.
+            node_eni = None
             addr = next((a.get("PrivateIPv4Address") for a in (zone or {}).get("LoadBalancerAddresses", [])
                          if a.get("PrivateIPv4Address")), None)
-            hit = self.env.find_eni(addr, only=[(owner, region)], vpc_id=lb.get("VpcId")) if addr else None
-            if hit is None:
-                return unknown(f"the node address of NLB {name} is not reported or not found as an ENI")
-            node_eni = hit[2]
+            if addr:
+                hit = self.env.find_eni(addr, only=[(owner, region)], vpc_id=lb.get("VpcId"))
+                node_eni = hit[2] if hit else None
+            elif zone and zone.get("SubnetId"):
+                enis = self.env.call(owner, region, "describe_network_interfaces",
+                                     Filters=[{"Name": "subnet-id", "Values": [zone["SubnetId"]]}]).get("NetworkInterfaces", [])
+                mine = [e for e in enis if _NLB_DESC.match(e.get("Description") or "")
+                        and _NLB_DESC.match(e["Description"]).group(1) == name]
+                node_eni = mine[0] if len(mine) == 1 else None
+            if node_eni is None:
+                return unknown(f"the node of NLB {name} in the endpoint's zone could not be found as an ENI")
         node_id, node_ip = node_eni["NetworkInterfaceId"], node_eni.get("PrivateIpAddress")
         if endpoint_eni is not None:
             vpce = _VPCE_ID.search(endpoint_eni.get("Description") or "")

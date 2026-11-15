@@ -362,7 +362,7 @@ def _aws_model() -> dict[str, Any]:
             "LoadBalancerName": NLB_NAME, "Scheme": "internal", "VpcId": VPC_SHARED, "State": {"Code": "active"},
             "Type": "network",
             "AvailabilityZones": [{"ZoneName": AZ, "SubnetId": s["shared-nlb"]["SubnetId"],
-                                   "LoadBalancerAddresses": [{"PrivateIPv4Address": NLB_TOOLS_IP}]}],
+                                   "LoadBalancerAddresses": []}],
             "SecurityGroups": [sg["nlb"]], "IpAddressType": "ipv4",
             "EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic": "off"}],
         "listeners": [{

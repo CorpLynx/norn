@@ -48,6 +48,7 @@ FILTER_PATHS = {
     "association.main": "Associations.Main",
     "association.gateway-id": "Associations.GatewayId",
     "vpc-id": "VpcId",
+    "subnet-id": "SubnetId",
     "transit-gateway-id": "TransitGatewayId",
     "resource-type": "ResourceType",
     "state": "State",

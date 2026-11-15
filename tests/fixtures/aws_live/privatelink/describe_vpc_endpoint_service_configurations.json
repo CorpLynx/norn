@@ -1,0 +1,56 @@
+[
+ {
+  "params": {
+   "ServiceIds": [
+    "vpce-svc-0283315b65cb4a056"
+   ]
+  },
+  "response": {
+   "ServiceConfigurations": [
+    {
+     "AcceptanceRequired": false,
+     "AvailabilityZoneIds": [
+      "use1-az1",
+      "use1-az2"
+     ],
+     "AvailabilityZones": [
+      "us-east-1c",
+      "us-east-1d"
+     ],
+     "BaseEndpointDnsNames": [
+      "vpce-svc-0283315b65cb4a056.us-east-1.vpce.amazonaws.com"
+     ],
+     "ManagesVpcEndpoints": false,
+     "NetworkLoadBalancerArns": [
+      "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/0ee921ee073cc5f5"
+     ],
+     "PrivateDnsNameConfiguration": {},
+     "RemoteAccessEnabled": false,
+     "ServiceId": "vpce-svc-0283315b65cb4a056",
+     "ServiceName": "com.amazonaws.vpce.us-east-1.vpce-svc-0283315b65cb4a056",
+     "ServiceState": "Available",
+     "ServiceType": [
+      {
+       "ServiceType": "Interface"
+      }
+     ],
+     "SupportedIpAddressTypes": [
+      "ipv4"
+     ],
+     "SupportedRegions": [
+      {
+       "Region": "us-east-1",
+       "ServiceState": "Available"
+      }
+     ],
+     "Tags": [
+      {
+       "Key": "purpose",
+       "Value": "norn-privatelink-probe"
+      }
+     ]
+    }
+   ]
+  }
+ }
+]
