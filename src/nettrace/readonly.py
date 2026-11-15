@@ -139,6 +139,7 @@ _AWS_ALLOWED = frozenset(
         "SearchTransitGatewayRoutes", "DescribeVpcEndpoints", "DescribeNatGateways",
         "DescribeVpcPeeringConnections", "DescribeVpnGateways",
         "DescribeVpcEndpointServices", "DescribeVpcEndpointServiceConfigurations",  # PrivateLink (D21)
+        "DescribeInstances",  # the web map: each instance's Name tag and state only (D22)
     )]
     # Elastic Load Balancing v2: botocore names this service "elbv2" (service_model.service_name); the IAM prefix
     # is "elasticloadbalancing". The guard uses the first, iam/nettrace-readonly-policy.json the second (D21).

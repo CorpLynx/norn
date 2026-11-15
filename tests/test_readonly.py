@@ -122,7 +122,7 @@ def test_aws_allowed_assume_role():
 
 
 @pytest.mark.parametrize("service,op", [
-    ("ec2", "DescribeInstances"), ("ec2", "GetConsoleOutput"), ("ec2", "DescribeVolumes"),
+    ("ec2", "DescribeInstanceAttribute"), ("ec2", "GetConsoleOutput"), ("ec2", "DescribeVolumes"),
     ("iam", "ListRoles"), ("iam", "GetUser"), ("s3", "ListBuckets"), ("sts", "GetCallerIdentity"),
     ("sts", "AssumeRoleWithSAML"), ("ec2", "AssumeRole"), ("sts", "DescribeVpcs"),
     ("ec2", "RunInstances"), ("ec2", "TerminateInstances"), ("ec2", "CreateSecurityGroup"),
@@ -152,8 +152,8 @@ def test_aws_backend_override_applies_guard():
     AwsEnv.backend_override = staticmethod(lambda env: Boom())
     try:
         env = AwsEnv(Inv())
-        with pytest.raises(ReadOnlyViolation, match="ec2:DescribeInstances"):
-            env.call("1", "us-east-1", "describe_instances")
+        with pytest.raises(ReadOnlyViolation, match="ec2:DescribeInstanceAttribute"):
+            env.call("1", "us-east-1", "describe_instance_attribute")
         with pytest.raises(ReadOnlyViolation, match="iam:ListRoles"):
             env.call("1", "us-east-1", "list_roles", service="iam")
     finally:

@@ -189,6 +189,15 @@ h1,h2,h3{margin:0}
 .lod-mid,.lod-near{opacity:0;transition:opacity var(--med)}
 #stage[data-lod=mid] .lod-mid,#stage[data-lod=near] .lod-mid,#stage[data-lod=near] .lod-near{opacity:1}
 .node .lbl{font-size:min(17px,max(12.5px,calc(9px / var(--z,1))))}
+/* the live AWS map: box titles grow as the map shrinks so accounts and VPCs stay readable from far away; subnet titles,
+   host names and the box meta lines wait for a closer zoom. A host's name fades while far (its box and the gateways stay). */
+.glbl{font:600 12px var(--ui)}.gmeta{font:11px var(--mono);fill:#56605c}
+.glbl.k-aws{font-size:min(46px,max(14px,calc(13px / var(--z,1))))}.glbl.k-vpc{font-size:min(30px,max(12px,calc(10px / var(--z,1))))}
+.glbl.k-subnet{font-size:12px}
+.k-subnet-t,.node.minor .lbl{transition:opacity var(--med)}
+#stage[data-lod=far] .k-subnet-t,#stage[data-lod=far] .node.minor .lbl,#stage[data-lod=far] .node.minor .sub{opacity:0}
+dl.kv.wide{grid-template-columns:minmax(0,120px) 1fr}dl.kv dt.mono{font:11px var(--mono)}
+.dsec{margin:12px 0 4px;font-size:12.5px}
 .lnklbl rect{fill:#fff;stroke:var(--pline)}.lnklbl text{font:10px var(--ui);fill:#56605c}
 .ring,.ping{fill:none;transform-box:fill-box;transform-origin:center}
 .ring{stroke:currentColor;stroke-width:3.2;animation:ringin var(--slow) var(--ease)}
@@ -443,7 +452,7 @@ function depth(g){ let d = 0, p = g.parent; const by = Object.fromEntries(S.topo
 // Container tints (fill, stroke, label) are soft and conventional: they locate a node, they never signal status.
 // Status on the canvas is always the saturated ring, segment and packet colours.
 const GSTYLE = {prisma:["#fff6ec","#eaa567","#8f4f12"], site:["#f1f5fc","#9fb2d3","#33466b"], aws:["#fffaf0","#ecb467","#855309"],
-                account:["#fffdf8","#e0b77d","#7d541b"], vpc:["#f0f8f1","#86be8d","#2c6537"]};
+                account:["#fffdf8","#e0b77d","#7d541b"], vpc:["#f0f8f1","#86be8d","#2c6537"], subnet:["#fbfdfb","#aebfb2","#3d5143"]};
 function linkKey(a, b){ return a < b ? `${a}|${b}` : `${b}|${a}`; }
 function renderTopology(){
   const T = S.topo, [W, H] = T.size, I = S.boot.icons;
@@ -454,8 +463,10 @@ function renderTopology(){
   <rect width="${W}" height="${H}" fill="url(#grid)"/>`;
   for (const g of [...T.groups].sort((a, b) => depth(a) - depth(b))) {
     const [f, st, tc] = GSTYLE[g.kind] || GSTYLE.site, dash = g.kind === "account" ? ' stroke-dasharray="8 5"' : "";
-    s += `<g class="group"><rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="14" fill="${f}" stroke="${st}" stroke-width="1.2"${dash}/>
-      <text x="${g.x + 14}" y="${g.y + 22}" fill="${tc}" style="font:600 12px system-ui,sans-serif">${esc(g.label)}</text></g>`;
+    const kc = ["aws", "vpc", "subnet"].includes(g.kind) ? g.kind : "x", big = kc === "aws" ? 1.5 : kc === "vpc" ? 1.15 : 1;
+    s += `<g class="group"><rect x="${g.x}" y="${g.y}" width="${g.w}" height="${g.h}" rx="${kc === "subnet" ? 10 : 14}" fill="${f}" stroke="${st}" stroke-width="1.2"${dash}/>
+      <text class="glbl k-${kc}${kc === "subnet" ? " k-subnet-t" : ""}" x="${g.x + 14}" y="${g.y + 22 * big}" fill="${tc}">${esc(g.label)}</text>`
+      + (g.meta ? `<text class="gmeta lod-mid" x="${g.x + 14}" y="${g.y + 22 * big + 16}">${esc(g.meta)}</text>` : "") + `</g>`;
   }
   let tags = "";
   for (const l of T.links) {
@@ -480,7 +491,7 @@ function renderTopology(){
   }
   s += `<g id="ov"></g><g id="flow" pointer-events="none"></g><g id="tags" pointer-events="none">${tags}</g>`;
   for (const n of T.nodes) {
-    s += `<g class="node" data-node="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.label)}${n.sub ? ", " + esc(n.sub) : ""}" transform="translate(${n.x},${n.y})"><title>${esc(n.label)} — ${esc(n.sub || "")}</title>
+    s += `<g class="node${n.minor ? " minor" : ""}" data-node="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.label)}${n.sub ? ", " + esc(n.sub) : ""}" transform="translate(${n.x},${n.y})"><title>${esc(n.full || n.label)} — ${esc(n.sub || "")}</title>
       <rect class="ping" x="-35" y="-35" width="70" height="70" rx="16"/><rect class="ring" x="-35" y="-35" width="70" height="70" rx="16" style="display:none"/>
       <rect class="tile" x="-29" y="-29" width="58" height="58" rx="13"/>
       <g transform="scale(.86)">${I[n.kind] || I.generic}</g>
@@ -1150,7 +1161,7 @@ async function copyText(text){
 }
 function deviceFacts(n, dev){
   const f = [["kind", n.kind], ["group", (S.topo.groups.find(g => g.id === n.group) || {}).label], ["prefixes", (n.cidrs || []).join(", ")],
-    ["AWS ids", (n.ids || []).join(", ")], ["VPC", (n.vpcs || []).join(", ")]];
+    ["AWS ids", (n.detail || []).length ? "" : (n.ids || []).join(", ")], ["VPC", (n.detail || []).length ? "" : (n.vpcs || []).join(", ")]];
   if (dev) f.push(["platform", dev.platform], ["reached", dev.via === "panorama" ? `via Panorama · inventory serial ${dev.serial} (HA follows the active member)` : (dev.host || "")], ["site", dev.site || ""]);
   return f.filter(x => x[1]).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
 }
@@ -1159,6 +1170,12 @@ function deviceAddrs(n){
   if (!(n.addrs || []).length) return "";
   return `<b>Interfaces</b><dl class="kv addrl">` + n.addrs.map(r => `<dt>${esc(r.if || "(static)")}</dt><dd>${esc(r.ip)}</dd>`).join("")
     + `</dl>` + (n.addrs_more ? `<p class="lab">+${esc(n.addrs_more)} more not shown</p>` : "");
+}
+// sections the server attached to a node (the live AWS map): {title, rows:[[key, value]...]} or {title, items:[...]}; all text is escaped
+function detailHtml(n){
+  return (n.detail || []).map(sec => `<h4 class="dsec">${esc(sec.title)}</h4>` + (sec.rows
+    ? `<dl class="kv wide">` + sec.rows.map(r => `<dt class="mono">${esc(r[0])}</dt><dd>${esc(r[1])}</dd>`).join("") + `</dl>`
+    : `<ul class="det">` + (sec.items || []).map(i => `<li>${esc(i)}</li>`).join("") + `</ul>`)).join("");
 }
 function deviceHops(n){
   if (!S.entry) return ""; const hn = S.hn, here = allHops().filter(h => hn[String(h.index)] === n.id);
@@ -1198,7 +1215,7 @@ function renderDevice(){
   const devName = (n.devices || []).find(d => S.boot.devices[d]), dev = devName ? S.boot.devices[devName] : null;
   const prompt = dev ? (dev.platform === "cisco_iosxe" ? `${devName}#` : `admin@${devName}>`) : "";
   let html = `<div class="devhead"><svg viewBox="-30 -30 60 60" aria-hidden="true">${S.boot.icons[n.kind] || S.boot.icons.generic}</svg><div><h3>${esc(n.label)}</h3><div class="lab">${esc(n.sub || "")}</div></div></div>
-    <dl class="kv">${deviceFacts(n, dev)}</dl>${deviceAddrs(n)}${deviceHops(n)}`;
+    <dl class="kv">${deviceFacts(n, dev)}</dl>${(n.detail || []).length ? detailHtml(n) : deviceAddrs(n)}${deviceHops(n)}`;
   if (dev) { const [top, bottom] = consoleHtml(devName, dev, prompt, S.console[devName] || (S.console[devName] = {lines: [], hist: [], hi: 0}));
     html = `<div class="devscroll">${html}${top}</div>${bottom}`; p.classList.add("devtab"); }
   else if (n.kind !== "external") html += `<div class="note">${n.vpcs || n.ids ? "AWS components have no console: Norn reads them with Describe/Search API calls during a trace. Each hop's evidence shows the exact calls." : "This node represents addresses, not a managed device."}</div>`;
@@ -1366,8 +1383,8 @@ function findNodes(q){
       else { const c = (n.cidrs || []).filter(x => inCidr(ip, x)).sort((x, y) => +y.split("/")[1] - +x.split("/")[1])[0];
         if (c) { score = 10 + +c.split("/")[1]; why = `in ${c}`; } }
     } else {
-      const hay = [[n.label, ""], [n.id, ""], [n.sub, ""], ...(n.devices || []).map(d => [d, "device"]), ...(n.ids || []).map(d => [d, ""]),
-                   ...(n.addrs || []).map(r => [r.if, r.ip])];
+      const hay = [[n.label, ""], [n.full, ""], [n.id, ""], [n.sub, ""], ...(n.devices || []).map(d => [d, "device"]), ...(n.ids || []).map(d => [d, ""]),
+                   ...(n.addrs || []).map(r => [r.if, r.ip]), ...(n.find || []).map(w => [w, "security group / name"])];
       for (const [text, extra] of hay) { if (!text) continue; const t = String(text).toLowerCase();
         const sc = t === low ? 90 : t.startsWith(low) ? 70 : t.includes(low) ? 40 : 0;
         if (sc > score) { score = sc; why = extra && extra !== "device" ? `${text} ${extra}` : text === n.label ? (n.sub || "") : String(text); } }
@@ -1428,6 +1445,7 @@ function fatal(msg){ document.body.innerHTML = `<div class="fatal" role="alert">
 async function startup(){
   try { S.boot = await api("/api/bootstrap"); } catch (e) { fatal(e.message); return; }
   S.topo = S.boot.topology; renderLeft(); renderTopology(); renderPane(); refreshHistory(); syncProto();
+  if ((S.topo.notes || []).length) toast(`The AWS map could not read ${S.topo.notes.length} thing${S.topo.notes.length > 1 ? "s" : ""}; the account node says what.`);
   const h = HASH;
   if (h.get("preset")) {
     const p = S.boot.presets.find(x => x.id === h.get("preset"));

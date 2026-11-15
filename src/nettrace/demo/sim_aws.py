@@ -108,6 +108,15 @@ class Backend:
             return {"Routes": self._search(params), "AdditionalRoutesAvailable": False}
         if op == "get_managed_prefix_list_entries":
             return {"Entries": []}
+        if op == "describe_instances":
+            out = [r for r in m["instances"] if r["OwnerId"] == account]
+            ids = params.get("InstanceIds")
+            if ids:
+                out = [{**r, "Instances": [i for i in r["Instances"] if i["InstanceId"] in ids]} for r in out]
+                out = [r for r in out if r["Instances"]]
+            return {"Reservations": copy.deepcopy(out)}
+        if op == "describe_nat_gateways":
+            return {"NatGateways": _apply(self._owned("nat_gateways", account), params, "NatGatewayId", "NatGatewayIds")}
         if op == "describe_vpc_endpoints":
             return {"VpcEndpoints": _apply(self._owned("vpc_endpoints", account), params, "VpcEndpointId", "VpcEndpointIds")}
         if op == "describe_vpc_endpoint_services":
@@ -201,7 +210,7 @@ _EMPTY = {
     "describe_network_interfaces": {"NetworkInterfaces": []}, "describe_subnets": {"Subnets": []},
     "describe_vpcs": {"Vpcs": []}, "describe_route_tables": {"RouteTables": []},
     "describe_network_acls": {"NetworkAcls": []}, "describe_security_groups": {"SecurityGroups": []},
-    "describe_nat_gateways": {"NatGateways": []}, "describe_vpc_endpoints": {"VpcEndpoints": []},
+    "describe_nat_gateways": {"NatGateways": []}, "describe_instances": {"Reservations": []}, "describe_vpc_endpoints": {"VpcEndpoints": []},
     "describe_vpc_peering_connections": {"VpcPeeringConnections": []}, "describe_vpn_gateways": {"VpnGateways": []},
     "describe_transit_gateway_peering_attachments": {"TransitGatewayPeeringAttachments": []},
     "describe_vpc_endpoint_service_configurations": {"ServiceConfigurations": []},

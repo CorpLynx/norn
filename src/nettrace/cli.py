@@ -672,6 +672,26 @@ def _aws_env(ctx: Ctx) -> Any:
     return AwsEnv(ctx.inv)
 
 
+@aws_group.command("map")
+@pass_ctx
+def aws_map_cmd(ctx: Ctx) -> None:
+    """The live AWS map the web UI draws: VPCs, subnets, hosts, gateways, NLBs, Transit Gateway (Describe calls only).
+
+    Use -o json for the full structure (groups, nodes with details, links, counts, read failures).
+    """
+    from nettrace.web.aws_map import build_aws_map
+
+    if not ctx.inv.aws_accounts:
+        raise NetTraceError("the inventory has no aws: accounts")
+    with ctx.status("reading AWS (read-only)"):
+        topo = build_aws_map(ctx.inv, progress=None if ctx.output != "table" else lambda m: ctx.err.print(escape(m)))
+    if ctx.output == "table":
+        ctx.emit([{"Account": n["label"], "Status": n["sub"]} for n in topo["nodes"] if n["kind"] in ("account", "error")]
+                 + [{"Account": "total", "Status": ", ".join(f"{v} {k}" for k, v in topo["counts"].items())}])
+        return
+    ctx.emit(topo)
+
+
 @aws_group.command("find-ip")
 @click.option("--ip", required=True, callback=_ip)
 @pass_ctx
@@ -733,10 +753,33 @@ def aws_search_tgw(ctx: Ctx, account: str, region: str, route_table_id: str, des
 
 
 # ===== serve / demo =================================================================================
-def _serve(ctx: Ctx, port: int, open_browser: bool, verbose: bool) -> None:
+def _live_aws_topology(ctx: Ctx) -> dict[str, Any] | None:
+    """The live AWS map for `serve` (read-only Describe calls, once, at startup). Any failure is a warning and the plain
+    inventory view is used instead."""
+    from nettrace.web.aws_map import build_aws_map, merge_with_inventory
+    from nettrace.web.topology import auto_topology
+
+    inv = ctx.inv
+    ctx.err.print("[bold]Building the AWS map[/] (read-only; --no-aws-map skips it)")
+    try:
+        topo = build_aws_map(inv, progress=lambda m: ctx.err.print(escape(m)))
+        topo = merge_with_inventory(topo, auto_topology(inv))
+    except Exception as exc:  # noqa: BLE001 - the map is a convenience; the server must still start
+        ctx.err.print(f"[yellow]warning:[/] could not build the AWS map ({escape(type(exc).__name__)}: {escape(str(exc)[:200])}); "
+                      "showing the inventory view instead")
+        return None
+    c = topo.get("counts", {})
+    ctx.err.print(f"  AWS map: {c.get('accounts', 0)} accounts, {c.get('vpcs', 0)} VPCs, {c.get('subnets', 0)} subnets, "
+                  f"{c.get('instances', 0)} instances, {c.get('nodes', 0)} nodes"
+                  + (f" · [yellow]{c['read_failures']} reads failed (marked on the map)[/]" if c.get("read_failures") else ""))
+    return topo
+
+
+def _serve(ctx: Ctx, port: int, open_browser: bool, verbose: bool, aws_map: bool = False) -> None:
     from nettrace.web.server import serve
 
     inv = ctx.inv
+    topology = _live_aws_topology(ctx) if aws_map and not ctx.demo and inv.aws_accounts else None
 
     def ready(url: str, app: Any) -> None:
         mode = "DEMO LAB (simulated devices)" if ctx.demo else f"LIVE inventory {inv.path} (read-only queries)"
@@ -749,7 +792,7 @@ def _serve(ctx: Ctx, port: int, open_browser: bool, verbose: bool) -> None:
         ctx.err.print("  bound to 127.0.0.1 only; every API call needs the session this link starts. Ctrl-C to stop.")
 
     try:
-        serve(inv, demo=ctx.demo, port=port, open_browser=open_browser, verbose=verbose, on_ready=ready)
+        serve(inv, demo=ctx.demo, port=port, open_browser=open_browser, verbose=verbose, on_ready=ready, topology=topology)
     except OSError as exc:
         raise NetTraceError(f"can't listen on 127.0.0.1:{port}: {exc.strerror or exc}") from None
 
@@ -759,13 +802,16 @@ def _serve(ctx: Ctx, port: int, open_browser: bool, verbose: bool) -> None:
 @click.option("--open/--no-open", "open_browser", default=True, show_default=True,
               help="Open the one-time login URL in your browser (--no-open only prints it).")
 @click.option("--verbose", "-v", is_flag=True, help="Log HTTP requests.")
+@click.option("--aws-map/--no-aws-map", "aws_map", default=True, show_default=True,
+              help="With AWS accounts in the inventory, read them (Describe calls only) at startup and draw the real VPCs, "
+                   "subnets, hosts, gateways and load balancers. --no-aws-map shows the plain inventory view.")
 @pass_ctx
-def serve_cmd(ctx: Ctx, port: int, open_browser: bool, verbose: bool) -> None:
+def serve_cmd(ctx: Ctx, port: int, open_browser: bool, verbose: bool, aws_map: bool) -> None:
     """Local web UI: topology, multi-packet flow animation, path maps, read-only device console.
 
     With --demo (or `nettrace demo serve`) it runs against the simulated Acme Corp lab.
     """
-    _serve(ctx, port, open_browser, verbose)
+    _serve(ctx, port, open_browser, verbose, aws_map)
 
 
 @cli.group()

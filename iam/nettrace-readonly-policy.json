@@ -23,6 +23,7 @@
         "ec2:DescribeVpnGateways",
         "ec2:DescribeVpcEndpointServices",
         "ec2:DescribeVpcEndpointServiceConfigurations",
+        "ec2:DescribeInstances",
         "elasticloadbalancing:DescribeLoadBalancers",
         "elasticloadbalancing:DescribeListeners",
         "elasticloadbalancing:DescribeTargetGroups",

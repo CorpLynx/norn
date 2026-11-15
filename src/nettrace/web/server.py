@@ -61,7 +61,7 @@ CANCEL_RATE = (30, 10.0)  # at most 30 cancel calls per 10 s
 PROGRESS_MAX = 400  # events kept per running trace (a trace stops at max_hops; this only bounds a misbehaving one)
 TOKEN_RE = re.compile(r"[A-Za-z0-9._@\\\-]{1,64}")
 ICON_KINDS = ("router", "firewall", "prisma", "tgw", "vpc-router", "eni", "host", "endpoint", "igw", "external",
-              "natgw", "gwlbe", "vpce", "error", "lan", "users", "account", "peering", "vgw", "exit", "generic")
+              "natgw", "gwlbe", "vpce", "nlb", "error", "lan", "users", "account", "peering", "vgw", "exit", "generic")
 
 QUICK = {
     "cisco_iosxe": ["show ip interface brief", "show ip route", "show ip access-lists", "show interfaces description",
@@ -77,7 +77,8 @@ PANOS_CLI = {
     "show high-availability state": ["show", "high-availability", "state"],
 }
 class App:
-    def __init__(self, inv: Inventory, *, demo: bool, code_ttl: float = LOGIN_TTL, clock: Any = time.monotonic):
+    def __init__(self, inv: Inventory, *, demo: bool, code_ttl: float = LOGIN_TTL, clock: Any = time.monotonic,
+                 topology: dict[str, Any] | None = None):
         self.inv = inv
         self.demo = demo
         if demo:
@@ -87,7 +88,8 @@ class App:
             self.presets = lab.PRESETS
             self.title = "Acme Corp demo lab"
         else:
-            self.topology = annotate_addresses(auto_topology(inv), inv)
+            # `topology` is the live AWS map (web/aws_map.py), built once at startup by the caller; None = the plain inventory view
+            self.topology = annotate_addresses(topology or auto_topology(inv), inv)
             self.presets = []
             self.title = str(inv.path)
         self.token = secrets.token_urlsafe(24)  # long-lived per-run session secret
@@ -591,8 +593,8 @@ def make_handler(app: App, port: int, verbose: bool) -> type[BaseHTTPRequestHand
 
 
 def serve(inv: Inventory, *, demo: bool, port: int = 8765, open_browser: bool = True,
-          verbose: bool = False, on_ready: Any = None) -> None:
-    app = App(inv, demo=demo)
+          verbose: bool = False, on_ready: Any = None, topology: dict[str, Any] | None = None) -> None:
+    app = App(inv, demo=demo, topology=topology)
     httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(app, port, verbose))
     httpd.daemon_threads = True
     # The one-time code is in argv (visible to `ps`), but it is single-use and dies after 60 s; the session secret is not.

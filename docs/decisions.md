@@ -3,6 +3,26 @@
 Short records of choices made while building nettrace. Each one says why it was made, so a later
 change can be judged against the original reason. Newest first.
 
+## D22. The live AWS map reads instance names with `ec2:DescribeInstances` (2026-11-15)
+`nettrace serve` (with `aws:` accounts in the inventory) and `nettrace aws map` draw the real AWS network: accounts > VPCs >
+subnets > hosts, NAT and internet gateways, VPC endpoints, NLBs with targets and health, and the Transit Gateway
+(`web/aws_map.py`; `--no-aws-map` turns it off). It reads once at startup (a restart rebuilds it; there is no refresh route) with
+calls that already existed (VPCs, subnets, ENIs, security groups, route tables, NAT gateways, endpoints, TGW, ELB v2 reads) and
+**one new one: `ec2:DescribeInstances`**, because an instance's `Name` tag and state are not on its ENI.
+- **What is read and kept.** Only `InstanceId`, `State.Name` and the `Name` tag survive the call (the rest of the response is
+  dropped in `_read_region`). DescribeInstances never returns user data (that is `DescribeInstanceAttribute`, which stays
+  refused), and nothing else (other tags, key names, profiles) is used. Security groups are shown as rule summaries on a
+  node's details, not as nodes. Internet gateways are named by the route tables (no `DescribeInternetGateways`).
+- **Never guess.** A call that fails (or an account that cannot be read) is listed on the account node as "could not read:
+  <reason>"; nothing is silently left out, and a failure never stops the server (the plain inventory view is the fallback).
+- **Untrusted text.** Names and descriptions are control-character-stripped and length-capped in Python and escaped again by
+  `esc()` in the UI (rule 10); the page stays free of external URLs.
+- **Policy.** The allowlist, both policy JSON copies and the simulator got the one action; the compact session policy is 990
+  of 2048 characters (tested). Every call goes through `AwsEnv.call` (allowlist, audit, deadline, cache).
+- **Hop to node.** `web/topology.py` maps AWS hops by structured fields only: an ENI/source/security-group hop to its instance
+  (or inventory device), `nat-gateway`/`internet-gateway`/endpoint/`nlb`/`target-group`/`tgw` hops to their node, otherwise the
+  VPC router node. A host address claimed by two nodes is never attributed to either.
+
 ## D21. PrivateLink and Network Load Balancers are followed to the real target (2026-11-15)
 A flow to an interface endpoint ENI or an NLB node ENI used to end "delivered to the ENI". It now continues: endpoint ->
 endpoint service (owner account) -> NLB -> listener -> target group -> target -> target ENI, with the NACL and

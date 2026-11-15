@@ -7,6 +7,8 @@ Node match keys used to place hops:
   vpcs:    VPC ids (VPC route tables, NACLs, and checks without an ENI)
   cidrs:   prefixes for sources / destinations (longest match wins; 0.0.0.0/0 is the Internet)
   accounts: AWS account ids (auto topology: one node per account)
+  ips:      exact addresses of a host the live AWS map drew (web/aws_map.py); a source or destination that equals one
+            lights that node. An address two nodes claim (overlapping address space) is never attributed to either.
 """
 
 from __future__ import annotations
@@ -70,6 +72,8 @@ def annotate_addresses(topology: dict[str, Any], inv: Inventory) -> dict[str, An
         rows = sorted({row for d in n.get("devices", []) for row in by_dev.get(d, [])}, key=lambda r: (r[0] == "", ip_sort(r)))
         if rows:
             node_addrs[n["id"]] = rows
+            if "addrs" in n:  # the live AWS map already set the node's addresses (its own ENIs)
+                continue
             n["addrs"] = [{"if": i, "ip": ip} for i, ip in rows[:_ADDR_MAX]]
             if len(rows) > _ADDR_MAX:
                 n["addrs_more"] = len(rows) - _ADDR_MAX
@@ -96,7 +100,10 @@ class Locator:
         self.by_vpc: dict[str, str] = {}
         self.by_account: dict[str, str] = {}
         self.cidrs: list[tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, str]] = []
+        self.by_addr: dict[str, str | None] = {}  # exact host address -> node (None: claimed by several nodes)
         for n in self.nodes:
+            for ip in n.get("ips", []):
+                self.by_addr[ip] = n["id"] if self.by_addr.get(ip, n["id"]) == n["id"] else None
             for d in n.get("devices", []):
                 self.by_device[d] = n["id"]
             for i in n.get("ids", []):
@@ -116,6 +123,8 @@ class Locator:
             addr = ipaddress.ip_address(ip)
         except ValueError:
             return None
+        if self.by_addr.get(ip):
+            return self.by_addr[ip]
         best = None
         for net, nid in self.cidrs:
             if net.version == addr.version and addr in net and (allow_default or net.prefixlen > 0):
@@ -137,8 +146,20 @@ class Locator:
             if comp == "error":
                 return self.by_device.get(node)
             return None  # links are drawn as edges, not nodes
-        # AWS: an ENI the hop is about wins (SG on a firewall ENI belongs to the firewall).
-        for key in (h.get("ingress"), h.get("egress"), node):
+        # AWS: the most specific thing the hop is about. Structured fields only (never summary text). An ENI the hop is
+        # about wins (a security-group hop on a firewall's ENI belongs to the firewall; on a host's, to the host).
+        # Where the order differs: a target-group hop's `egress` is the target's ENI, but the hop is the NLB's;
+        # gateways, endpoints and load balancers are named by `node`; Transit Gateway hops by the attachment or table.
+        ing, eg = h.get("ingress"), h.get("egress")
+        if comp in ("nlb", "vpc-endpoint", "interface-endpoint", "gwlb-endpoint", "nat-gateway", "internet-gateway"):
+            keys = (node, ing, eg)
+        elif comp == "target-group":
+            keys = (ing, node)
+        elif comp in ("tgw", "tgw-route-table"):
+            keys = (ing, eg, node, loc.get("tgw"))
+        else:
+            keys = (ing, eg, node)
+        for key in keys:
             if key and key in self.by_id:
                 return self.by_id[key]
         return self._by_location(loc)

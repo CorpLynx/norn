@@ -194,6 +194,7 @@ ATT_VPN, ATT_INSP = rid("tgw-attach", "vpn-dc1"), rid("tgw-attach", "inspection"
 ATT_PROD, ATT_SHARED = rid("tgw-attach", "prod"), rid("tgw-attach", "shared")
 VPC_INSP, VPC_PROD, VPC_SHARED = rid("vpc", "inspection"), rid("vpc", "prod"), rid("vpc", "shared")
 IGW_INSP = rid("igw", "inspection")
+NAT_INSP = rid("nat", "inspection")
 ENI = {name: rid("eni", name) for name in ("fw-trust", "fw-untrust", "web01", "db01", "dns01",
                                            "ep-tools", "nlb-tools", "tools01")}
 
@@ -425,7 +426,21 @@ def _aws_model() -> dict[str, Any]:
     vpcs = [{"VpcId": VPC_INSP, "CidrBlock": "10.100.0.0/16", "OwnerId": ACCT_NET, "State": "available"},
             {"VpcId": VPC_PROD, "CidrBlock": "10.20.0.0/16", "OwnerId": ACCT_PROD, "State": "available"},
             {"VpcId": VPC_SHARED, "CidrBlock": "10.30.0.0/16", "OwnerId": ACCT_SHARED, "State": "available"}]
+    def instance(name: str, iid: str, acct: str, state: str = "running") -> dict[str, Any]:
+        """DescribeInstances shape, as far as the web map reads it (Name tag and state)."""
+        return {"OwnerId": acct, "Instances": [{"InstanceId": iid, "InstanceType": "t3.small", "State": {"Name": state},
+                                                "Tags": [{"Key": "Name", "Value": name}]}]}
+
+    instances = [instance("fw-aws-1", FW_AWS_INSTANCE, ACCT_NET), instance("web01", rid("i", "web01"), ACCT_PROD),
+                 instance("dns01", rid("i", "dns01"), ACCT_SHARED), instance("tools01", TOOLS01_INSTANCE, ACCT_SHARED)]
+    # One NAT gateway in the inspection VPC's untrust subnet (nothing in the demo routes through it; the web map shows it).
+    nat_gateways = [{"NatGatewayId": NAT_INSP, "VpcId": VPC_INSP, "SubnetId": s["insp-fw-untrust"]["SubnetId"],
+                     "State": "available", "ConnectivityType": "public", "OwnerId": ACCT_NET,
+                     "NatGatewayAddresses": [{"PrivateIp": "10.100.2.200", "PublicIp": "203.0.113.50",
+                                              "NetworkInterfaceId": rid("eni", "nat-insp")}],
+                     "Tags": [{"Key": "Name", "Value": "insp-nat"}]}]
     return {
+        "instances": instances, "nat_gateways": nat_gateways,
         "vpcs": vpcs, "subnets": list(s.values()), "route_tables": route_tables, "nacls": nacls,
         "security_groups": security_groups, "enis": enis,
         "tgws": [{"TransitGatewayId": TGW, "OwnerId": ACCT_NET, "State": "available"}],
