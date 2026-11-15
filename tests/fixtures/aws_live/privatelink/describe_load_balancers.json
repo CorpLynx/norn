@@ -1,48 +1,6 @@
 [
  {
   "params": {
-   "LoadBalancerArns": [
-    "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/0ee921ee073cc5f5"
-   ]
-  },
-  "response": {
-   "LoadBalancers": [
-    {
-     "AvailabilityZones": [
-      {
-       "LoadBalancerAddresses": [],
-       "SubnetId": "subnet-05545a1a52651626d",
-       "ZoneName": "us-east-1c"
-      },
-      {
-       "LoadBalancerAddresses": [],
-       "SubnetId": "subnet-00de8a56806fc996e",
-       "ZoneName": "us-east-1d"
-      }
-     ],
-     "CanonicalHostedZoneId": "Z26RNL4JYFTOTI",
-     "CreatedTime": "2026-11-15 13:25:31.973000+00:00",
-     "DNSName": "norn-probe-nlb-0ee921ee073cc5f5.elb.us-east-1.amazonaws.com",
-     "EnablePrefixForIpv6SourceNat": "off",
-     "EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic": "on",
-     "IpAddressType": "ipv4",
-     "LoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/0ee921ee073cc5f5",
-     "LoadBalancerName": "norn-probe-nlb",
-     "Scheme": "internal",
-     "SecurityGroups": [
-      "sg-09226e072a33a19a0"
-     ],
-     "State": {
-      "Code": "active"
-     },
-     "Type": "network",
-     "VpcId": "vpc-043d60068398555af"
-    }
-   ]
-  }
- },
- {
-  "params": {
    "Names": [
     "norn-probe-nlb"
    ]
@@ -53,32 +11,74 @@
      "AvailabilityZones": [
       {
        "LoadBalancerAddresses": [],
-       "SubnetId": "subnet-05545a1a52651626d",
+       "SubnetId": "subnet-06e4ce49d9ff9b58d",
        "ZoneName": "us-east-1c"
       },
       {
        "LoadBalancerAddresses": [],
-       "SubnetId": "subnet-00de8a56806fc996e",
+       "SubnetId": "subnet-0560b85d7fd3bda77",
        "ZoneName": "us-east-1d"
       }
      ],
      "CanonicalHostedZoneId": "Z26RNL4JYFTOTI",
-     "CreatedTime": "2026-11-15 13:25:31.973000+00:00",
-     "DNSName": "norn-probe-nlb-0ee921ee073cc5f5.elb.us-east-1.amazonaws.com",
+     "CreatedTime": "2026-11-15 13:44:37.971000+00:00",
+     "DNSName": "norn-probe-nlb-a8f2a5df66e7697a.elb.us-east-1.amazonaws.com",
      "EnablePrefixForIpv6SourceNat": "off",
      "EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic": "on",
      "IpAddressType": "ipv4",
-     "LoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/0ee921ee073cc5f5",
+     "LoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/a8f2a5df66e7697a",
      "LoadBalancerName": "norn-probe-nlb",
      "Scheme": "internal",
      "SecurityGroups": [
-      "sg-09226e072a33a19a0"
+      "sg-0d8b6450b93ef5058"
      ],
      "State": {
       "Code": "active"
      },
      "Type": "network",
-     "VpcId": "vpc-043d60068398555af"
+     "VpcId": "vpc-03fdce0a29dd1833c"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "LoadBalancerArns": [
+    "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/a8f2a5df66e7697a"
+   ]
+  },
+  "response": {
+   "LoadBalancers": [
+    {
+     "AvailabilityZones": [
+      {
+       "LoadBalancerAddresses": [],
+       "SubnetId": "subnet-06e4ce49d9ff9b58d",
+       "ZoneName": "us-east-1c"
+      },
+      {
+       "LoadBalancerAddresses": [],
+       "SubnetId": "subnet-0560b85d7fd3bda77",
+       "ZoneName": "us-east-1d"
+      }
+     ],
+     "CanonicalHostedZoneId": "Z26RNL4JYFTOTI",
+     "CreatedTime": "2026-11-15 13:44:37.971000+00:00",
+     "DNSName": "norn-probe-nlb-a8f2a5df66e7697a.elb.us-east-1.amazonaws.com",
+     "EnablePrefixForIpv6SourceNat": "off",
+     "EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic": "on",
+     "IpAddressType": "ipv4",
+     "LoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/a8f2a5df66e7697a",
+     "LoadBalancerName": "norn-probe-nlb",
+     "Scheme": "internal",
+     "SecurityGroups": [
+      "sg-0d8b6450b93ef5058"
+     ],
+     "State": {
+      "Code": "active"
+     },
+     "Type": "network",
+     "VpcId": "vpc-03fdce0a29dd1833c"
     }
    ]
   }

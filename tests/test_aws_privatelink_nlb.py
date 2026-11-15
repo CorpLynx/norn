@@ -376,9 +376,29 @@ def test_direct_nlb_with_client_ip_preservation_keeps_the_client_address(model: 
     assert "interface-endpoint" not in comps(r) and "via NLB tools-nlb (direct)" in r.reason
 
 
-def test_direct_nlb_with_preservation_means_the_target_must_allow_the_client(model: dict[str, Any]) -> None:
-    r = trace(_direct())  # tools-server only trusts the NLB's group: the client address is what it sees
+def test_direct_nlb_with_preservation_accepts_a_target_rule_that_names_the_nlb_group(model: dict[str, Any]) -> None:
+    """Live (D21 Q1/Q4): tools-server trusts only the NLB's group; the target still sees the client address, and the
+    connection succeeds."""
+    r = trace(_direct())
+    assert r.outcome == Outcome.REACHABLE, r.reason
+    assert r.final_flow.src == "10.30.1.53"
+    last_sg = [h for h in r.hops if h.component == "security-group"][-1]
+    assert last_sg.status == Status.PASS and any("references the NLB's security group" in d for d in last_sg.details)
+
+
+def test_direct_nlb_with_preservation_blocks_when_nothing_allows_it(model: dict[str, Any]) -> None:
+    sg(model, "tools-server")["IpPermissions"][0]["UserIdGroupPairs"] = []
+    r = trace(_direct())
     assert r.outcome == Outcome.BLOCKED and "from 10.30.1.53" in r.hops[-1].summary
+
+
+def test_direct_nlb_with_preservation_is_unknown_when_only_the_node_address_matches(model: dict[str, Any]) -> None:
+    """Not proven live: a CIDR rule that only the NLB node's address matches."""
+    perm = sg(model, "tools-server")["IpPermissions"][0]
+    perm["UserIdGroupPairs"], perm["IpRanges"] = [], [{"CidrIp": f"{lab.NLB_TOOLS_IP}/32"}]
+    r = trace(_direct())
+    assert r.outcome == Outcome.INCOMPLETE and r.hops[-1].status == Status.UNKNOWN
+    assert "node address" in r.hops[-1].details[-1]
 
 
 def test_direct_nlb_without_preservation_uses_the_nlb_address(model: dict[str, Any]) -> None:
@@ -407,7 +427,14 @@ def test_privatelink_inbound_rule_enforcement_attribute(model: dict[str, Any]) -
     assert trace().outcome == Outcome.REACHABLE  # "off": inbound rules are not enforced for PrivateLink traffic
     lb["EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic"] = "on"
     r = trace()
-    assert r.outcome == Outcome.INCOMPLETE and r.hops[-1].status == Status.UNKNOWN  # a deny on an undocumented address
+    # live (D21 Q3): the rules see a consumer-side address; neither the endpoint's nor the client's is allowed -> BLOCK
+    assert r.outcome == Outcome.BLOCKED and r.hops[-1].status == Status.BLOCK
+    # a rule for the endpoint ENI's address only: the endpoint address and the client are judged differently -> UNKNOWN
+    ep_ip = lab.EP_TOOLS_IP
+    sg(model, "tools-nlb")["IpPermissions"] = [{"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "UserIdGroupPairs": [],
+                                                "IpRanges": [{"CidrIp": f"{ep_ip}/32"}], "Ipv6Ranges": [], "PrefixListIds": []}]
+    r = trace()
+    assert r.outcome == Outcome.INCOMPLETE and r.hops[-1].status == Status.UNKNOWN
     sg(model, "tools-nlb")["IpPermissions"] = [{"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "UserIdGroupPairs": [],
                                                 "IpRanges": [{"CidrIp": "10.20.0.0/16"}], "Ipv6Ranges": [], "PrefixListIds": []}]
     r = trace()

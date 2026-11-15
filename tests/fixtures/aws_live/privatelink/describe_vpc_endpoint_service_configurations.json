@@ -2,7 +2,7 @@
  {
   "params": {
    "ServiceIds": [
-    "vpce-svc-0283315b65cb4a056"
+    "vpce-svc-025b9f78f6d781a10"
    ]
   },
   "response": {
@@ -18,16 +18,16 @@
       "us-east-1d"
      ],
      "BaseEndpointDnsNames": [
-      "vpce-svc-0283315b65cb4a056.us-east-1.vpce.amazonaws.com"
+      "vpce-svc-025b9f78f6d781a10.us-east-1.vpce.amazonaws.com"
      ],
      "ManagesVpcEndpoints": false,
      "NetworkLoadBalancerArns": [
-      "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/0ee921ee073cc5f5"
+      "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/a8f2a5df66e7697a"
      ],
      "PrivateDnsNameConfiguration": {},
      "RemoteAccessEnabled": false,
-     "ServiceId": "vpce-svc-0283315b65cb4a056",
-     "ServiceName": "com.amazonaws.vpce.us-east-1.vpce-svc-0283315b65cb4a056",
+     "ServiceId": "vpce-svc-025b9f78f6d781a10",
+     "ServiceName": "com.amazonaws.vpce.us-east-1.vpce-svc-025b9f78f6d781a10",
      "ServiceState": "Available",
      "ServiceType": [
       {

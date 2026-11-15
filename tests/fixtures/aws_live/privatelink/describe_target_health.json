@@ -1,7 +1,7 @@
 [
  {
   "params": {
-   "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-ok/a19c8480d0322721"
+   "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-pre/68e2c9633ee59c92"
   },
   "response": {
    "TargetHealthDescriptions": [
@@ -13,7 +13,7 @@
      },
      "HealthCheckPort": "8080",
      "Target": {
-      "Id": "i-071c9aa517b3ce5ac",
+      "Id": "i-00c9c3e8ce7b06a59",
       "Port": 8080
      },
      "TargetHealth": {
@@ -25,7 +25,7 @@
  },
  {
   "params": {
-   "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-denied/a715133b3c5e47c8"
+   "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-nopre/46b091365295d333"
   },
   "response": {
    "TargetHealthDescriptions": [
@@ -37,7 +37,31 @@
      },
      "HealthCheckPort": "8080",
      "Target": {
-      "Id": "i-071c9aa517b3ce5ac",
+      "Id": "i-00c9c3e8ce7b06a59",
+      "Port": 8080
+     },
+     "TargetHealth": {
+      "State": "healthy"
+     }
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-83/6c95d1358faf4e05"
+  },
+  "response": {
+   "TargetHealthDescriptions": [
+    {
+     "AdministrativeOverride": {
+      "Description": "No override is currently active on target",
+      "Reason": "AdministrativeOverride.NoOverride",
+      "State": "no_override"
+     },
+     "HealthCheckPort": "8081",
+     "Target": {
+      "Id": "i-00c9c3e8ce7b06a59",
       "Port": 8081
      },
      "TargetHealth": {

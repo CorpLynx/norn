@@ -2,7 +2,54 @@
  {
   "params": {
    "SubnetIds": [
-    "subnet-0d08a2211b2ef5518"
+    "subnet-0560b85d7fd3bda77"
+   ]
+  },
+  "response": {
+   "Subnets": [
+    {
+     "AssignIpv6AddressOnCreation": false,
+     "AvailabilityZone": "us-east-1d",
+     "AvailabilityZoneId": "use1-az2",
+     "AvailableIpAddressCount": 121,
+     "BlockPublicAccessStates": {
+      "InternetGatewayBlockMode": "off"
+     },
+     "CidrBlock": "10.240.0.128/25",
+     "DefaultForAz": false,
+     "EnableDns64": false,
+     "Ipv6CidrBlockAssociationSet": [],
+     "Ipv6Native": false,
+     "MapCustomerOwnedIpOnLaunch": false,
+     "MapPublicIpOnLaunch": false,
+     "OwnerId": "111122223333",
+     "PrivateDnsNameOptionsOnLaunch": {
+      "EnableResourceNameDnsAAAARecord": false,
+      "EnableResourceNameDnsARecord": false,
+      "HostnameType": "ip-name"
+     },
+     "State": "available",
+     "SubnetArn": "arn:aws:ec2:us-east-1:111122223333:subnet/subnet-0560b85d7fd3bda77",
+     "SubnetId": "subnet-0560b85d7fd3bda77",
+     "Tags": [
+      {
+       "Key": "purpose",
+       "Value": "norn-privatelink-probe"
+      },
+      {
+       "Key": "Name",
+       "Value": "norn-probe-p1"
+      }
+     ],
+     "VpcId": "vpc-03fdce0a29dd1833c"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "SubnetIds": [
+    "subnet-0d8ab24993e96b130"
    ]
   },
   "response": {
@@ -29,8 +76,8 @@
       "HostnameType": "ip-name"
      },
      "State": "available",
-     "SubnetArn": "arn:aws:ec2:us-east-1:111122223333:subnet/subnet-0d08a2211b2ef5518",
-     "SubnetId": "subnet-0d08a2211b2ef5518",
+     "SubnetArn": "arn:aws:ec2:us-east-1:111122223333:subnet/subnet-0d8ab24993e96b130",
+     "SubnetId": "subnet-0d8ab24993e96b130",
      "Tags": [
       {
        "Key": "Name",
@@ -41,54 +88,7 @@
        "Value": "norn-privatelink-probe"
       }
      ],
-     "VpcId": "vpc-0b02caebeed10552b"
-    }
-   ]
-  }
- },
- {
-  "params": {
-   "SubnetIds": [
-    "subnet-05545a1a52651626d"
-   ]
-  },
-  "response": {
-   "Subnets": [
-    {
-     "AssignIpv6AddressOnCreation": false,
-     "AvailabilityZone": "us-east-1c",
-     "AvailabilityZoneId": "use1-az1",
-     "AvailableIpAddressCount": 120,
-     "BlockPublicAccessStates": {
-      "InternetGatewayBlockMode": "off"
-     },
-     "CidrBlock": "10.240.0.0/25",
-     "DefaultForAz": false,
-     "EnableDns64": false,
-     "Ipv6CidrBlockAssociationSet": [],
-     "Ipv6Native": false,
-     "MapCustomerOwnedIpOnLaunch": false,
-     "MapPublicIpOnLaunch": false,
-     "OwnerId": "111122223333",
-     "PrivateDnsNameOptionsOnLaunch": {
-      "EnableResourceNameDnsAAAARecord": false,
-      "EnableResourceNameDnsARecord": false,
-      "HostnameType": "ip-name"
-     },
-     "State": "available",
-     "SubnetArn": "arn:aws:ec2:us-east-1:111122223333:subnet/subnet-05545a1a52651626d",
-     "SubnetId": "subnet-05545a1a52651626d",
-     "Tags": [
-      {
-       "Key": "purpose",
-       "Value": "norn-privatelink-probe"
-      },
-      {
-       "Key": "Name",
-       "Value": "norn-probe-p0"
-      }
-     ],
-     "VpcId": "vpc-043d60068398555af"
+     "VpcId": "vpc-09d2120b203c749de"
     }
    ]
   }

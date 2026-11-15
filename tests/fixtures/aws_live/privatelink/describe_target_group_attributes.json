@@ -1,7 +1,7 @@
 [
  {
   "params": {
-   "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-ok/a19c8480d0322721"
+   "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-pre/68e2c9633ee59c92"
   },
   "response": {
    "Attributes": [
@@ -62,7 +62,68 @@
  },
  {
   "params": {
-   "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-denied/a715133b3c5e47c8"
+   "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-nopre/46b091365295d333"
+  },
+  "response": {
+   "Attributes": [
+    {
+     "Key": "proxy_protocol_v2.enabled",
+     "Value": "false"
+    },
+    {
+     "Key": "target_group_health.unhealthy_state_routing.minimum_healthy_targets.percentage",
+     "Value": "off"
+    },
+    {
+     "Key": "deregistration_delay.timeout_seconds",
+     "Value": "300"
+    },
+    {
+     "Key": "stickiness.type",
+     "Value": "source_ip"
+    },
+    {
+     "Key": "target_health_state.unhealthy.draining_interval_seconds",
+     "Value": "0"
+    },
+    {
+     "Key": "target_group_health.dns_failover.minimum_healthy_targets.percentage",
+     "Value": "off"
+    },
+    {
+     "Key": "load_balancing.cross_zone.enabled",
+     "Value": "use_load_balancer_configuration"
+    },
+    {
+     "Key": "target_group_health.unhealthy_state_routing.minimum_healthy_targets.count",
+     "Value": "1"
+    },
+    {
+     "Key": "stickiness.enabled",
+     "Value": "false"
+    },
+    {
+     "Key": "preserve_client_ip.enabled",
+     "Value": "false"
+    },
+    {
+     "Key": "target_group_health.dns_failover.minimum_healthy_targets.count",
+     "Value": "1"
+    },
+    {
+     "Key": "target_health_state.unhealthy.connection_termination.enabled",
+     "Value": "true"
+    },
+    {
+     "Key": "deregistration_delay.connection_termination.enabled",
+     "Value": "false"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "TargetGroupArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:targetgroup/tg-83/6c95d1358faf4e05"
   },
   "response": {
    "Attributes": [

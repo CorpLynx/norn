@@ -5,7 +5,7 @@
     {
      "Name": "addresses.private-ip-address",
      "Values": [
-      "10.241.0.63"
+      "10.240.0.174"
      ]
     }
    ]
@@ -13,44 +13,50 @@
   "response": {
    "NetworkInterfaces": [
     {
-     "AvailabilityZone": "us-east-1c",
-     "AvailabilityZoneId": "use1-az1",
-     "Description": "norn-probe client",
+     "Attachment": {
+      "AttachTime": "2026-11-15 13:47:15+00:00",
+      "AttachmentId": "eni-attach-0aeca3c9a8bd7e0e9",
+      "DeleteOnTermination": true,
+      "DeviceIndex": 0,
+      "InstanceId": "i-0f5617c4b24899e7f",
+      "InstanceOwnerId": "111122223333",
+      "NetworkCardIndex": 0,
+      "Status": "attached"
+     },
+     "AvailabilityZone": "us-east-1d",
+     "AvailabilityZoneId": "use1-az2",
+     "Description": "",
      "Groups": [
       {
-       "GroupId": "sg-033ad8304882aca14",
+       "GroupId": "sg-05bdfe63faefebc24",
        "GroupName": "norn-probe-client"
       }
      ],
      "InterfaceType": "interface",
      "Ipv6Addresses": [],
-     "MacAddress": "02:ff:c3:7a:d6:e3",
-     "NetworkInterfaceId": "eni-05a6df4b6225793b3",
+     "MacAddress": "12:ff:ec:47:ca:dd",
+     "NetworkInterfaceId": "eni-0383151fa0d34bc3c",
      "Operator": {
       "HiddenByDefault": false,
       "Managed": false
      },
      "OwnerId": "111122223333",
-     "PrivateIpAddress": "10.241.0.63",
+     "PrivateDnsName": "ip-10-240-0-174.ec2.internal",
+     "PrivateIpAddress": "10.240.0.174",
      "PrivateIpAddresses": [
       {
        "Primary": true,
-       "PrivateIpAddress": "10.241.0.63"
+       "PrivateDnsName": "ip-10-240-0-174.ec2.internal",
+       "PrivateIpAddress": "10.240.0.174"
       }
      ],
      "PublicDnsName": "",
-     "RequesterId": "AIDA5RNCR3ETB3YMPFYSI",
      "RequesterManaged": false,
      "SourceDestCheck": true,
-     "Status": "available",
-     "SubnetId": "subnet-0d08a2211b2ef5518",
-     "TagSet": [
-      {
-       "Key": "purpose",
-       "Value": "norn-privatelink-probe"
-      }
-     ],
-     "VpcId": "vpc-0b02caebeed10552b"
+     "Status": "in-use",
+     "SubnetId": "subnet-0560b85d7fd3bda77",
+     "TagSet": [],
+     "VpcId": "vpc-03fdce0a29dd1833c"
     }
    ]
   }
@@ -61,7 +67,7 @@
     {
      "Name": "association.public-ip",
      "Values": [
-      "10.241.0.63"
+      "10.240.0.174"
      ]
     }
    ]
@@ -73,50 +79,56 @@
  {
   "params": {
    "NetworkInterfaceIds": [
-    "eni-05a6df4b6225793b3"
+    "eni-0383151fa0d34bc3c"
    ]
   },
   "response": {
    "NetworkInterfaces": [
     {
-     "AvailabilityZone": "us-east-1c",
-     "AvailabilityZoneId": "use1-az1",
-     "Description": "norn-probe client",
+     "Attachment": {
+      "AttachTime": "2026-11-15 13:47:15+00:00",
+      "AttachmentId": "eni-attach-0aeca3c9a8bd7e0e9",
+      "DeleteOnTermination": true,
+      "DeviceIndex": 0,
+      "InstanceId": "i-0f5617c4b24899e7f",
+      "InstanceOwnerId": "111122223333",
+      "NetworkCardIndex": 0,
+      "Status": "attached"
+     },
+     "AvailabilityZone": "us-east-1d",
+     "AvailabilityZoneId": "use1-az2",
+     "Description": "",
      "Groups": [
       {
-       "GroupId": "sg-033ad8304882aca14",
+       "GroupId": "sg-05bdfe63faefebc24",
        "GroupName": "norn-probe-client"
       }
      ],
      "InterfaceType": "interface",
      "Ipv6Addresses": [],
-     "MacAddress": "02:ff:c3:7a:d6:e3",
-     "NetworkInterfaceId": "eni-05a6df4b6225793b3",
+     "MacAddress": "12:ff:ec:47:ca:dd",
+     "NetworkInterfaceId": "eni-0383151fa0d34bc3c",
      "Operator": {
       "HiddenByDefault": false,
       "Managed": false
      },
      "OwnerId": "111122223333",
-     "PrivateIpAddress": "10.241.0.63",
+     "PrivateDnsName": "ip-10-240-0-174.ec2.internal",
+     "PrivateIpAddress": "10.240.0.174",
      "PrivateIpAddresses": [
       {
        "Primary": true,
-       "PrivateIpAddress": "10.241.0.63"
+       "PrivateDnsName": "ip-10-240-0-174.ec2.internal",
+       "PrivateIpAddress": "10.240.0.174"
       }
      ],
      "PublicDnsName": "",
-     "RequesterId": "AIDA5RNCR3ETB3YMPFYSI",
      "RequesterManaged": false,
      "SourceDestCheck": true,
-     "Status": "available",
-     "SubnetId": "subnet-0d08a2211b2ef5518",
-     "TagSet": [
-      {
-       "Key": "purpose",
-       "Value": "norn-privatelink-probe"
-      }
-     ],
-     "VpcId": "vpc-0b02caebeed10552b"
+     "Status": "in-use",
+     "SubnetId": "subnet-0560b85d7fd3bda77",
+     "TagSet": [],
+     "VpcId": "vpc-03fdce0a29dd1833c"
     }
    ]
   }
@@ -127,7 +139,7 @@
     {
      "Name": "addresses.private-ip-address",
      "Values": [
-      "10.241.0.103"
+      "10.240.0.153"
      ]
     }
    ]
@@ -136,289 +148,151 @@
    "NetworkInterfaces": [
     {
      "Attachment": {
-      "AttachmentId": "ela-attach-07901db7cb7bd37c7",
+      "AttachmentId": "ela-attach-056d5c3cbbc5f82f8",
       "DeleteOnTermination": false,
       "DeviceIndex": 1,
       "InstanceOwnerId": "amazon-aws",
       "Status": "attached"
      },
-     "AvailabilityZone": "us-east-1c",
-     "AvailabilityZoneId": "use1-az1",
-     "Description": "VPC Endpoint Interface vpce-06cd448cb2f85fa57",
+     "AvailabilityZone": "us-east-1d",
+     "AvailabilityZoneId": "use1-az2",
+     "Description": "ELB net/norn-probe-nlb/a8f2a5df66e7697a",
      "Groups": [
       {
-       "GroupId": "sg-067ed97cc5261164a",
-       "GroupName": "norn-probe-endpoint"
-      }
-     ],
-     "InterfaceType": "vpc_endpoint",
-     "Ipv6Addresses": [],
-     "MacAddress": "02:ff:cb:da:d9:37",
-     "NetworkInterfaceId": "eni-0bbc7e8f705bea0c2",
-     "Operator": {
-      "HiddenByDefault": false,
-      "Managed": false
-     },
-     "OwnerId": "111122223333",
-     "PrivateIpAddress": "10.241.0.103",
-     "PrivateIpAddresses": [
-      {
-       "Primary": true,
-       "PrivateIpAddress": "10.241.0.103"
-      }
-     ],
-     "PublicDnsName": "",
-     "RequesterId": "727180483921",
-     "RequesterManaged": true,
-     "SourceDestCheck": true,
-     "Status": "in-use",
-     "SubnetId": "subnet-0d08a2211b2ef5518",
-     "TagSet": [],
-     "VpcId": "vpc-0b02caebeed10552b"
-    }
-   ]
-  }
- },
- {
-  "params": {
-   "Filters": [
-    {
-     "Name": "association.public-ip",
-     "Values": [
-      "10.241.0.103"
-     ]
-    }
-   ]
-  },
-  "response": {
-   "NetworkInterfaces": []
-  }
- },
- {
-  "params": {
-   "Filters": [
-    {
-     "Name": "addresses.private-ip-address",
-     "Values": [
-      "10.241.0.103"
-     ]
-    },
-    {
-     "Name": "vpc-id",
-     "Values": [
-      "vpc-0b02caebeed10552b"
-     ]
-    }
-   ]
-  },
-  "response": {
-   "NetworkInterfaces": [
-    {
-     "Attachment": {
-      "AttachmentId": "ela-attach-07901db7cb7bd37c7",
-      "DeleteOnTermination": false,
-      "DeviceIndex": 1,
-      "InstanceOwnerId": "amazon-aws",
-      "Status": "attached"
-     },
-     "AvailabilityZone": "us-east-1c",
-     "AvailabilityZoneId": "use1-az1",
-     "Description": "VPC Endpoint Interface vpce-06cd448cb2f85fa57",
-     "Groups": [
-      {
-       "GroupId": "sg-067ed97cc5261164a",
-       "GroupName": "norn-probe-endpoint"
-      }
-     ],
-     "InterfaceType": "vpc_endpoint",
-     "Ipv6Addresses": [],
-     "MacAddress": "02:ff:cb:da:d9:37",
-     "NetworkInterfaceId": "eni-0bbc7e8f705bea0c2",
-     "Operator": {
-      "HiddenByDefault": false,
-      "Managed": false
-     },
-     "OwnerId": "111122223333",
-     "PrivateIpAddress": "10.241.0.103",
-     "PrivateIpAddresses": [
-      {
-       "Primary": true,
-       "PrivateIpAddress": "10.241.0.103"
-      }
-     ],
-     "PublicDnsName": "",
-     "RequesterId": "727180483921",
-     "RequesterManaged": true,
-     "SourceDestCheck": true,
-     "Status": "in-use",
-     "SubnetId": "subnet-0d08a2211b2ef5518",
-     "TagSet": [],
-     "VpcId": "vpc-0b02caebeed10552b"
-    }
-   ]
-  }
- },
- {
-  "params": {
-   "Filters": [
-    {
-     "Name": "association.public-ip",
-     "Values": [
-      "10.241.0.103"
-     ]
-    },
-    {
-     "Name": "vpc-id",
-     "Values": [
-      "vpc-0b02caebeed10552b"
-     ]
-    }
-   ]
-  },
-  "response": {
-   "NetworkInterfaces": []
-  }
- },
- {
-  "params": {
-   "Filters": [
-    {
-     "Name": "subnet-id",
-     "Values": [
-      "subnet-05545a1a52651626d"
-     ]
-    }
-   ]
-  },
-  "response": {
-   "NetworkInterfaces": [
-    {
-     "Attachment": {
-      "AttachTime": "2026-11-15 13:25:35+00:00",
-      "AttachmentId": "eni-attach-07347117e298f9788",
-      "DeleteOnTermination": true,
-      "DeviceIndex": 0,
-      "InstanceId": "i-071c9aa517b3ce5ac",
-      "InstanceOwnerId": "111122223333",
-      "NetworkCardIndex": 0,
-      "Status": "attached"
-     },
-     "AvailabilityZone": "us-east-1c",
-     "AvailabilityZoneId": "use1-az1",
-     "Description": "",
-     "Groups": [
-      {
-       "GroupId": "sg-0249b0b99bf276f8c",
-       "GroupName": "norn-probe-target"
-      }
-     ],
-     "InterfaceType": "interface",
-     "Ipv6Addresses": [],
-     "MacAddress": "02:ff:db:9c:3c:71",
-     "NetworkInterfaceId": "eni-042bfdcc8ff7f5e10",
-     "Operator": {
-      "HiddenByDefault": false,
-      "Managed": false
-     },
-     "OwnerId": "111122223333",
-     "PrivateIpAddress": "10.240.0.116",
-     "PrivateIpAddresses": [
-      {
-       "Primary": true,
-       "PrivateIpAddress": "10.240.0.116"
-      }
-     ],
-     "PublicDnsName": "",
-     "RequesterManaged": false,
-     "SourceDestCheck": true,
-     "Status": "in-use",
-     "SubnetId": "subnet-05545a1a52651626d",
-     "TagSet": [],
-     "VpcId": "vpc-043d60068398555af"
-    },
-    {
-     "AvailabilityZone": "us-east-1c",
-     "AvailabilityZoneId": "use1-az1",
-     "Description": "norn-probe provider source",
-     "Groups": [
-      {
-       "GroupId": "sg-08a949f0ff60f19ac",
-       "GroupName": "norn-probe-src"
-      }
-     ],
-     "InterfaceType": "interface",
-     "Ipv6Addresses": [],
-     "MacAddress": "02:ff:d3:b0:99:69",
-     "NetworkInterfaceId": "eni-03dbadfa75c2076c5",
-     "Operator": {
-      "HiddenByDefault": false,
-      "Managed": false
-     },
-     "OwnerId": "111122223333",
-     "PrivateIpAddress": "10.240.0.4",
-     "PrivateIpAddresses": [
-      {
-       "Primary": true,
-       "PrivateIpAddress": "10.240.0.4"
-      }
-     ],
-     "PublicDnsName": "",
-     "RequesterId": "AIDA5RNCR3ETB3YMPFYSI",
-     "RequesterManaged": false,
-     "SourceDestCheck": true,
-     "Status": "available",
-     "SubnetId": "subnet-05545a1a52651626d",
-     "TagSet": [
-      {
-       "Key": "purpose",
-       "Value": "norn-privatelink-probe"
-      }
-     ],
-     "VpcId": "vpc-043d60068398555af"
-    },
-    {
-     "Attachment": {
-      "AttachmentId": "ela-attach-08e6696f3be369be6",
-      "DeleteOnTermination": false,
-      "DeviceIndex": 1,
-      "InstanceOwnerId": "amazon-aws",
-      "Status": "attached"
-     },
-     "AvailabilityZone": "us-east-1c",
-     "AvailabilityZoneId": "use1-az1",
-     "Description": "ELB net/norn-probe-nlb/0ee921ee073cc5f5",
-     "Groups": [
-      {
-       "GroupId": "sg-09226e072a33a19a0",
+       "GroupId": "sg-0d8b6450b93ef5058",
        "GroupName": "norn-probe-nlb"
       }
      ],
      "InterfaceType": "network_load_balancer",
      "Ipv6Addresses": [],
-     "MacAddress": "02:ff:ce:93:6a:29",
-     "NetworkInterfaceId": "eni-07dfd2b4c22fb7c65",
+     "MacAddress": "12:ff:c2:97:a0:81",
+     "NetworkInterfaceId": "eni-0d03c48317897f23f",
      "Operator": {
       "HiddenByDefault": false,
       "Managed": false
      },
      "OwnerId": "111122223333",
-     "PrivateIpAddress": "10.240.0.97",
+     "PrivateDnsName": "ip-10-240-0-153.ec2.internal",
+     "PrivateIpAddress": "10.240.0.153",
      "PrivateIpAddresses": [
       {
        "Primary": true,
-       "PrivateIpAddress": "10.240.0.97"
+       "PrivateDnsName": "ip-10-240-0-153.ec2.internal",
+       "PrivateIpAddress": "10.240.0.153"
       }
      ],
      "PublicDnsName": "",
-     "RequesterId": "803465164726",
+     "RequesterId": "762112775527",
      "RequesterManaged": true,
      "SourceDestCheck": false,
      "Status": "in-use",
-     "SubnetId": "subnet-05545a1a52651626d",
+     "SubnetId": "subnet-0560b85d7fd3bda77",
      "TagSet": [],
-     "VpcId": "vpc-043d60068398555af"
+     "VpcId": "vpc-03fdce0a29dd1833c"
     }
    ]
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "association.public-ip",
+     "Values": [
+      "10.240.0.153"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "NetworkInterfaces": []
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "addresses.private-ip-address",
+     "Values": [
+      "10.240.0.153"
+     ]
+    },
+    {
+     "Name": "vpc-id",
+     "Values": [
+      "vpc-03fdce0a29dd1833c"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "NetworkInterfaces": [
+    {
+     "Attachment": {
+      "AttachmentId": "ela-attach-056d5c3cbbc5f82f8",
+      "DeleteOnTermination": false,
+      "DeviceIndex": 1,
+      "InstanceOwnerId": "amazon-aws",
+      "Status": "attached"
+     },
+     "AvailabilityZone": "us-east-1d",
+     "AvailabilityZoneId": "use1-az2",
+     "Description": "ELB net/norn-probe-nlb/a8f2a5df66e7697a",
+     "Groups": [
+      {
+       "GroupId": "sg-0d8b6450b93ef5058",
+       "GroupName": "norn-probe-nlb"
+      }
+     ],
+     "InterfaceType": "network_load_balancer",
+     "Ipv6Addresses": [],
+     "MacAddress": "12:ff:c2:97:a0:81",
+     "NetworkInterfaceId": "eni-0d03c48317897f23f",
+     "Operator": {
+      "HiddenByDefault": false,
+      "Managed": false
+     },
+     "OwnerId": "111122223333",
+     "PrivateDnsName": "ip-10-240-0-153.ec2.internal",
+     "PrivateIpAddress": "10.240.0.153",
+     "PrivateIpAddresses": [
+      {
+       "Primary": true,
+       "PrivateDnsName": "ip-10-240-0-153.ec2.internal",
+       "PrivateIpAddress": "10.240.0.153"
+      }
+     ],
+     "PublicDnsName": "",
+     "RequesterId": "762112775527",
+     "RequesterManaged": true,
+     "SourceDestCheck": false,
+     "Status": "in-use",
+     "SubnetId": "subnet-0560b85d7fd3bda77",
+     "TagSet": [],
+     "VpcId": "vpc-03fdce0a29dd1833c"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "association.public-ip",
+     "Values": [
+      "10.240.0.153"
+     ]
+    },
+    {
+     "Name": "vpc-id",
+     "Values": [
+      "vpc-03fdce0a29dd1833c"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "NetworkInterfaces": []
   }
  },
  {
@@ -427,7 +301,7 @@
     {
      "Name": "attachment.instance-id",
      "Values": [
-      "i-071c9aa517b3ce5ac"
+      "i-00c9c3e8ce7b06a59"
      ]
     },
     {
@@ -442,11 +316,11 @@
    "NetworkInterfaces": [
     {
      "Attachment": {
-      "AttachTime": "2026-11-15 13:25:35+00:00",
-      "AttachmentId": "eni-attach-07347117e298f9788",
+      "AttachTime": "2026-11-15 13:44:41+00:00",
+      "AttachmentId": "eni-attach-08bd3e8521e0b4e11",
       "DeleteOnTermination": true,
       "DeviceIndex": 0,
-      "InstanceId": "i-071c9aa517b3ce5ac",
+      "InstanceId": "i-00c9c3e8ce7b06a59",
       "InstanceOwnerId": "111122223333",
       "NetworkCardIndex": 0,
       "Status": "attached"
@@ -456,33 +330,35 @@
      "Description": "",
      "Groups": [
       {
-       "GroupId": "sg-0249b0b99bf276f8c",
+       "GroupId": "sg-0b4628463fac322ef",
        "GroupName": "norn-probe-target"
       }
      ],
      "InterfaceType": "interface",
      "Ipv6Addresses": [],
-     "MacAddress": "02:ff:db:9c:3c:71",
-     "NetworkInterfaceId": "eni-042bfdcc8ff7f5e10",
+     "MacAddress": "02:ff:c0:ef:4a:25",
+     "NetworkInterfaceId": "eni-0808f15ab1d2d49e3",
      "Operator": {
       "HiddenByDefault": false,
       "Managed": false
      },
      "OwnerId": "111122223333",
-     "PrivateIpAddress": "10.240.0.116",
+     "PrivateDnsName": "ip-10-240-0-104.ec2.internal",
+     "PrivateIpAddress": "10.240.0.104",
      "PrivateIpAddresses": [
       {
        "Primary": true,
-       "PrivateIpAddress": "10.240.0.116"
+       "PrivateDnsName": "ip-10-240-0-104.ec2.internal",
+       "PrivateIpAddress": "10.240.0.104"
       }
      ],
      "PublicDnsName": "",
      "RequesterManaged": false,
      "SourceDestCheck": true,
      "Status": "in-use",
-     "SubnetId": "subnet-05545a1a52651626d",
+     "SubnetId": "subnet-06e4ce49d9ff9b58d",
      "TagSet": [],
-     "VpcId": "vpc-043d60068398555af"
+     "VpcId": "vpc-03fdce0a29dd1833c"
     }
    ]
   }
@@ -493,13 +369,13 @@
     {
      "Name": "addresses.private-ip-address",
      "Values": [
-      "10.240.0.116"
+      "10.240.0.104"
      ]
     },
     {
      "Name": "vpc-id",
      "Values": [
-      "vpc-043d60068398555af"
+      "vpc-03fdce0a29dd1833c"
      ]
     }
    ]
@@ -508,11 +384,11 @@
    "NetworkInterfaces": [
     {
      "Attachment": {
-      "AttachTime": "2026-11-15 13:25:35+00:00",
-      "AttachmentId": "eni-attach-07347117e298f9788",
+      "AttachTime": "2026-11-15 13:44:41+00:00",
+      "AttachmentId": "eni-attach-08bd3e8521e0b4e11",
       "DeleteOnTermination": true,
       "DeviceIndex": 0,
-      "InstanceId": "i-071c9aa517b3ce5ac",
+      "InstanceId": "i-00c9c3e8ce7b06a59",
       "InstanceOwnerId": "111122223333",
       "NetworkCardIndex": 0,
       "Status": "attached"
@@ -522,33 +398,35 @@
      "Description": "",
      "Groups": [
       {
-       "GroupId": "sg-0249b0b99bf276f8c",
+       "GroupId": "sg-0b4628463fac322ef",
        "GroupName": "norn-probe-target"
       }
      ],
      "InterfaceType": "interface",
      "Ipv6Addresses": [],
-     "MacAddress": "02:ff:db:9c:3c:71",
-     "NetworkInterfaceId": "eni-042bfdcc8ff7f5e10",
+     "MacAddress": "02:ff:c0:ef:4a:25",
+     "NetworkInterfaceId": "eni-0808f15ab1d2d49e3",
      "Operator": {
       "HiddenByDefault": false,
       "Managed": false
      },
      "OwnerId": "111122223333",
-     "PrivateIpAddress": "10.240.0.116",
+     "PrivateDnsName": "ip-10-240-0-104.ec2.internal",
+     "PrivateIpAddress": "10.240.0.104",
      "PrivateIpAddresses": [
       {
        "Primary": true,
-       "PrivateIpAddress": "10.240.0.116"
+       "PrivateDnsName": "ip-10-240-0-104.ec2.internal",
+       "PrivateIpAddress": "10.240.0.104"
       }
      ],
      "PublicDnsName": "",
      "RequesterManaged": false,
      "SourceDestCheck": true,
      "Status": "in-use",
-     "SubnetId": "subnet-05545a1a52651626d",
+     "SubnetId": "subnet-06e4ce49d9ff9b58d",
      "TagSet": [],
-     "VpcId": "vpc-043d60068398555af"
+     "VpcId": "vpc-03fdce0a29dd1833c"
     }
    ]
   }
@@ -559,13 +437,13 @@
     {
      "Name": "association.public-ip",
      "Values": [
-      "10.240.0.116"
+      "10.240.0.104"
      ]
     },
     {
      "Name": "vpc-id",
      "Values": [
-      "vpc-043d60068398555af"
+      "vpc-03fdce0a29dd1833c"
      ]
     }
    ]
@@ -580,7 +458,7 @@
     {
      "Name": "addresses.private-ip-address",
      "Values": [
-      "10.240.0.97"
+      "10.240.0.37"
      ]
     }
    ]
@@ -589,7 +467,7 @@
    "NetworkInterfaces": [
     {
      "Attachment": {
-      "AttachmentId": "ela-attach-08e6696f3be369be6",
+      "AttachmentId": "ela-attach-074f8fc287de0a5ef",
       "DeleteOnTermination": false,
       "DeviceIndex": 1,
       "InstanceOwnerId": "amazon-aws",
@@ -597,27 +475,29 @@
      },
      "AvailabilityZone": "us-east-1c",
      "AvailabilityZoneId": "use1-az1",
-     "Description": "ELB net/norn-probe-nlb/0ee921ee073cc5f5",
+     "Description": "ELB net/norn-probe-nlb/a8f2a5df66e7697a",
      "Groups": [
       {
-       "GroupId": "sg-09226e072a33a19a0",
+       "GroupId": "sg-0d8b6450b93ef5058",
        "GroupName": "norn-probe-nlb"
       }
      ],
      "InterfaceType": "network_load_balancer",
      "Ipv6Addresses": [],
-     "MacAddress": "02:ff:ce:93:6a:29",
-     "NetworkInterfaceId": "eni-07dfd2b4c22fb7c65",
+     "MacAddress": "02:ff:e3:44:4f:41",
+     "NetworkInterfaceId": "eni-0411618d5d41ff03d",
      "Operator": {
       "HiddenByDefault": false,
       "Managed": false
      },
      "OwnerId": "111122223333",
-     "PrivateIpAddress": "10.240.0.97",
+     "PrivateDnsName": "ip-10-240-0-37.ec2.internal",
+     "PrivateIpAddress": "10.240.0.37",
      "PrivateIpAddresses": [
       {
        "Primary": true,
-       "PrivateIpAddress": "10.240.0.97"
+       "PrivateDnsName": "ip-10-240-0-37.ec2.internal",
+       "PrivateIpAddress": "10.240.0.37"
       }
      ],
      "PublicDnsName": "",
@@ -625,9 +505,9 @@
      "RequesterManaged": true,
      "SourceDestCheck": false,
      "Status": "in-use",
-     "SubnetId": "subnet-05545a1a52651626d",
+     "SubnetId": "subnet-06e4ce49d9ff9b58d",
      "TagSet": [],
-     "VpcId": "vpc-043d60068398555af"
+     "VpcId": "vpc-03fdce0a29dd1833c"
     }
    ]
   }
@@ -638,7 +518,7 @@
     {
      "Name": "association.public-ip",
      "Values": [
-      "10.240.0.97"
+      "10.240.0.37"
      ]
     }
    ]
@@ -653,7 +533,13 @@
     {
      "Name": "addresses.private-ip-address",
      "Values": [
-      "10.240.0.4"
+      "10.240.0.37"
+     ]
+    },
+    {
+     "Name": "vpc-id",
+     "Values": [
+      "vpc-03fdce0a29dd1833c"
      ]
     }
    ]
@@ -661,44 +547,48 @@
   "response": {
    "NetworkInterfaces": [
     {
+     "Attachment": {
+      "AttachmentId": "ela-attach-074f8fc287de0a5ef",
+      "DeleteOnTermination": false,
+      "DeviceIndex": 1,
+      "InstanceOwnerId": "amazon-aws",
+      "Status": "attached"
+     },
      "AvailabilityZone": "us-east-1c",
      "AvailabilityZoneId": "use1-az1",
-     "Description": "norn-probe provider source",
+     "Description": "ELB net/norn-probe-nlb/a8f2a5df66e7697a",
      "Groups": [
       {
-       "GroupId": "sg-08a949f0ff60f19ac",
-       "GroupName": "norn-probe-src"
+       "GroupId": "sg-0d8b6450b93ef5058",
+       "GroupName": "norn-probe-nlb"
       }
      ],
-     "InterfaceType": "interface",
+     "InterfaceType": "network_load_balancer",
      "Ipv6Addresses": [],
-     "MacAddress": "02:ff:d3:b0:99:69",
-     "NetworkInterfaceId": "eni-03dbadfa75c2076c5",
+     "MacAddress": "02:ff:e3:44:4f:41",
+     "NetworkInterfaceId": "eni-0411618d5d41ff03d",
      "Operator": {
       "HiddenByDefault": false,
       "Managed": false
      },
      "OwnerId": "111122223333",
-     "PrivateIpAddress": "10.240.0.4",
+     "PrivateDnsName": "ip-10-240-0-37.ec2.internal",
+     "PrivateIpAddress": "10.240.0.37",
      "PrivateIpAddresses": [
       {
        "Primary": true,
-       "PrivateIpAddress": "10.240.0.4"
+       "PrivateDnsName": "ip-10-240-0-37.ec2.internal",
+       "PrivateIpAddress": "10.240.0.37"
       }
      ],
      "PublicDnsName": "",
-     "RequesterId": "AIDA5RNCR3ETB3YMPFYSI",
-     "RequesterManaged": false,
-     "SourceDestCheck": true,
-     "Status": "available",
-     "SubnetId": "subnet-05545a1a52651626d",
-     "TagSet": [
-      {
-       "Key": "purpose",
-       "Value": "norn-privatelink-probe"
-      }
-     ],
-     "VpcId": "vpc-043d60068398555af"
+     "RequesterId": "803465164726",
+     "RequesterManaged": true,
+     "SourceDestCheck": false,
+     "Status": "in-use",
+     "SubnetId": "subnet-06e4ce49d9ff9b58d",
+     "TagSet": [],
+     "VpcId": "vpc-03fdce0a29dd1833c"
     }
    ]
   }
@@ -709,7 +599,90 @@
     {
      "Name": "association.public-ip",
      "Values": [
-      "10.240.0.4"
+      "10.240.0.37"
+     ]
+    },
+    {
+     "Name": "vpc-id",
+     "Values": [
+      "vpc-03fdce0a29dd1833c"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "NetworkInterfaces": []
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "addresses.private-ip-address",
+     "Values": [
+      "10.241.0.7"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "NetworkInterfaces": [
+    {
+     "Attachment": {
+      "AttachTime": "2026-11-15 13:48:39+00:00",
+      "AttachmentId": "eni-attach-09a9772f10e06e5d3",
+      "DeleteOnTermination": true,
+      "DeviceIndex": 0,
+      "InstanceId": "i-088d4f3a545bb7117",
+      "InstanceOwnerId": "111122223333",
+      "NetworkCardIndex": 0,
+      "Status": "attached"
+     },
+     "AvailabilityZone": "us-east-1c",
+     "AvailabilityZoneId": "use1-az1",
+     "Description": "",
+     "Groups": [
+      {
+       "GroupId": "sg-0ee782344c6a88136",
+       "GroupName": "norn-probe-clientb"
+      }
+     ],
+     "InterfaceType": "interface",
+     "Ipv6Addresses": [],
+     "MacAddress": "02:ff:c5:1e:e1:b5",
+     "NetworkInterfaceId": "eni-0a9aa64d711a093e5",
+     "Operator": {
+      "HiddenByDefault": false,
+      "Managed": false
+     },
+     "OwnerId": "111122223333",
+     "PrivateDnsName": "ip-10-241-0-7.ec2.internal",
+     "PrivateIpAddress": "10.241.0.7",
+     "PrivateIpAddresses": [
+      {
+       "Primary": true,
+       "PrivateDnsName": "ip-10-241-0-7.ec2.internal",
+       "PrivateIpAddress": "10.241.0.7"
+      }
+     ],
+     "PublicDnsName": "",
+     "RequesterManaged": false,
+     "SourceDestCheck": true,
+     "Status": "in-use",
+     "SubnetId": "subnet-0d8ab24993e96b130",
+     "TagSet": [],
+     "VpcId": "vpc-09d2120b203c749de"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "association.public-ip",
+     "Values": [
+      "10.241.0.7"
      ]
     }
    ]
@@ -721,50 +694,56 @@
  {
   "params": {
    "NetworkInterfaceIds": [
-    "eni-03dbadfa75c2076c5"
+    "eni-0a9aa64d711a093e5"
    ]
   },
   "response": {
    "NetworkInterfaces": [
     {
+     "Attachment": {
+      "AttachTime": "2026-11-15 13:48:39+00:00",
+      "AttachmentId": "eni-attach-09a9772f10e06e5d3",
+      "DeleteOnTermination": true,
+      "DeviceIndex": 0,
+      "InstanceId": "i-088d4f3a545bb7117",
+      "InstanceOwnerId": "111122223333",
+      "NetworkCardIndex": 0,
+      "Status": "attached"
+     },
      "AvailabilityZone": "us-east-1c",
      "AvailabilityZoneId": "use1-az1",
-     "Description": "norn-probe provider source",
+     "Description": "",
      "Groups": [
       {
-       "GroupId": "sg-08a949f0ff60f19ac",
-       "GroupName": "norn-probe-src"
+       "GroupId": "sg-0ee782344c6a88136",
+       "GroupName": "norn-probe-clientb"
       }
      ],
      "InterfaceType": "interface",
      "Ipv6Addresses": [],
-     "MacAddress": "02:ff:d3:b0:99:69",
-     "NetworkInterfaceId": "eni-03dbadfa75c2076c5",
+     "MacAddress": "02:ff:c5:1e:e1:b5",
+     "NetworkInterfaceId": "eni-0a9aa64d711a093e5",
      "Operator": {
       "HiddenByDefault": false,
       "Managed": false
      },
      "OwnerId": "111122223333",
-     "PrivateIpAddress": "10.240.0.4",
+     "PrivateDnsName": "ip-10-241-0-7.ec2.internal",
+     "PrivateIpAddress": "10.241.0.7",
      "PrivateIpAddresses": [
       {
        "Primary": true,
-       "PrivateIpAddress": "10.240.0.4"
+       "PrivateDnsName": "ip-10-241-0-7.ec2.internal",
+       "PrivateIpAddress": "10.241.0.7"
       }
      ],
      "PublicDnsName": "",
-     "RequesterId": "AIDA5RNCR3ETB3YMPFYSI",
      "RequesterManaged": false,
      "SourceDestCheck": true,
-     "Status": "available",
-     "SubnetId": "subnet-05545a1a52651626d",
-     "TagSet": [
-      {
-       "Key": "purpose",
-       "Value": "norn-privatelink-probe"
-      }
-     ],
-     "VpcId": "vpc-043d60068398555af"
+     "Status": "in-use",
+     "SubnetId": "subnet-0d8ab24993e96b130",
+     "TagSet": [],
+     "VpcId": "vpc-09d2120b203c749de"
     }
    ]
   }
@@ -775,13 +754,7 @@
     {
      "Name": "addresses.private-ip-address",
      "Values": [
-      "10.240.0.97"
-     ]
-    },
-    {
-     "Name": "vpc-id",
-     "Values": [
-      "vpc-043d60068398555af"
+      "10.241.0.73"
      ]
     }
    ]
@@ -790,7 +763,7 @@
    "NetworkInterfaces": [
     {
      "Attachment": {
-      "AttachmentId": "ela-attach-08e6696f3be369be6",
+      "AttachmentId": "ela-attach-0acdabba507601e08",
       "DeleteOnTermination": false,
       "DeviceIndex": 1,
       "InstanceOwnerId": "amazon-aws",
@@ -798,37 +771,39 @@
      },
      "AvailabilityZone": "us-east-1c",
      "AvailabilityZoneId": "use1-az1",
-     "Description": "ELB net/norn-probe-nlb/0ee921ee073cc5f5",
+     "Description": "VPC Endpoint Interface vpce-0eaefa3559130b3d3",
      "Groups": [
       {
-       "GroupId": "sg-09226e072a33a19a0",
-       "GroupName": "norn-probe-nlb"
+       "GroupId": "sg-00d12b0856cfb3246",
+       "GroupName": "norn-probe-endpoint"
       }
      ],
-     "InterfaceType": "network_load_balancer",
+     "InterfaceType": "vpc_endpoint",
      "Ipv6Addresses": [],
-     "MacAddress": "02:ff:ce:93:6a:29",
-     "NetworkInterfaceId": "eni-07dfd2b4c22fb7c65",
+     "MacAddress": "02:ff:f5:ca:62:21",
+     "NetworkInterfaceId": "eni-09299f83efdf75607",
      "Operator": {
       "HiddenByDefault": false,
       "Managed": false
      },
      "OwnerId": "111122223333",
-     "PrivateIpAddress": "10.240.0.97",
+     "PrivateDnsName": "ip-10-241-0-73.ec2.internal",
+     "PrivateIpAddress": "10.241.0.73",
      "PrivateIpAddresses": [
       {
        "Primary": true,
-       "PrivateIpAddress": "10.240.0.97"
+       "PrivateDnsName": "ip-10-241-0-73.ec2.internal",
+       "PrivateIpAddress": "10.241.0.73"
       }
      ],
      "PublicDnsName": "",
-     "RequesterId": "803465164726",
+     "RequesterId": "727180483921",
      "RequesterManaged": true,
-     "SourceDestCheck": false,
+     "SourceDestCheck": true,
      "Status": "in-use",
-     "SubnetId": "subnet-05545a1a52651626d",
+     "SubnetId": "subnet-0d8ab24993e96b130",
      "TagSet": [],
-     "VpcId": "vpc-043d60068398555af"
+     "VpcId": "vpc-09d2120b203c749de"
     }
    ]
   }
@@ -839,19 +814,474 @@
     {
      "Name": "association.public-ip",
      "Values": [
-      "10.240.0.97"
-     ]
-    },
-    {
-     "Name": "vpc-id",
-     "Values": [
-      "vpc-043d60068398555af"
+      "10.241.0.73"
      ]
     }
    ]
   },
   "response": {
    "NetworkInterfaces": []
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "addresses.private-ip-address",
+     "Values": [
+      "10.241.0.73"
+     ]
+    },
+    {
+     "Name": "vpc-id",
+     "Values": [
+      "vpc-09d2120b203c749de"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "NetworkInterfaces": [
+    {
+     "Attachment": {
+      "AttachmentId": "ela-attach-0acdabba507601e08",
+      "DeleteOnTermination": false,
+      "DeviceIndex": 1,
+      "InstanceOwnerId": "amazon-aws",
+      "Status": "attached"
+     },
+     "AvailabilityZone": "us-east-1c",
+     "AvailabilityZoneId": "use1-az1",
+     "Description": "VPC Endpoint Interface vpce-0eaefa3559130b3d3",
+     "Groups": [
+      {
+       "GroupId": "sg-00d12b0856cfb3246",
+       "GroupName": "norn-probe-endpoint"
+      }
+     ],
+     "InterfaceType": "vpc_endpoint",
+     "Ipv6Addresses": [],
+     "MacAddress": "02:ff:f5:ca:62:21",
+     "NetworkInterfaceId": "eni-09299f83efdf75607",
+     "Operator": {
+      "HiddenByDefault": false,
+      "Managed": false
+     },
+     "OwnerId": "111122223333",
+     "PrivateDnsName": "ip-10-241-0-73.ec2.internal",
+     "PrivateIpAddress": "10.241.0.73",
+     "PrivateIpAddresses": [
+      {
+       "Primary": true,
+       "PrivateDnsName": "ip-10-241-0-73.ec2.internal",
+       "PrivateIpAddress": "10.241.0.73"
+      }
+     ],
+     "PublicDnsName": "",
+     "RequesterId": "727180483921",
+     "RequesterManaged": true,
+     "SourceDestCheck": true,
+     "Status": "in-use",
+     "SubnetId": "subnet-0d8ab24993e96b130",
+     "TagSet": [],
+     "VpcId": "vpc-09d2120b203c749de"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "association.public-ip",
+     "Values": [
+      "10.241.0.73"
+     ]
+    },
+    {
+     "Name": "vpc-id",
+     "Values": [
+      "vpc-09d2120b203c749de"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "NetworkInterfaces": []
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "subnet-id",
+     "Values": [
+      "subnet-06e4ce49d9ff9b58d"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "NetworkInterfaces": [
+    {
+     "Attachment": {
+      "AttachTime": "2026-11-15 13:44:41+00:00",
+      "AttachmentId": "eni-attach-08bd3e8521e0b4e11",
+      "DeleteOnTermination": true,
+      "DeviceIndex": 0,
+      "InstanceId": "i-00c9c3e8ce7b06a59",
+      "InstanceOwnerId": "111122223333",
+      "NetworkCardIndex": 0,
+      "Status": "attached"
+     },
+     "AvailabilityZone": "us-east-1c",
+     "AvailabilityZoneId": "use1-az1",
+     "Description": "",
+     "Groups": [
+      {
+       "GroupId": "sg-0b4628463fac322ef",
+       "GroupName": "norn-probe-target"
+      }
+     ],
+     "InterfaceType": "interface",
+     "Ipv6Addresses": [],
+     "MacAddress": "02:ff:c0:ef:4a:25",
+     "NetworkInterfaceId": "eni-0808f15ab1d2d49e3",
+     "Operator": {
+      "HiddenByDefault": false,
+      "Managed": false
+     },
+     "OwnerId": "111122223333",
+     "PrivateDnsName": "ip-10-240-0-104.ec2.internal",
+     "PrivateIpAddress": "10.240.0.104",
+     "PrivateIpAddresses": [
+      {
+       "Primary": true,
+       "PrivateDnsName": "ip-10-240-0-104.ec2.internal",
+       "PrivateIpAddress": "10.240.0.104"
+      }
+     ],
+     "PublicDnsName": "",
+     "RequesterManaged": false,
+     "SourceDestCheck": true,
+     "Status": "in-use",
+     "SubnetId": "subnet-06e4ce49d9ff9b58d",
+     "TagSet": [],
+     "VpcId": "vpc-03fdce0a29dd1833c"
+    },
+    {
+     "Attachment": {
+      "AttachmentId": "ela-attach-074f8fc287de0a5ef",
+      "DeleteOnTermination": false,
+      "DeviceIndex": 1,
+      "InstanceOwnerId": "amazon-aws",
+      "Status": "attached"
+     },
+     "AvailabilityZone": "us-east-1c",
+     "AvailabilityZoneId": "use1-az1",
+     "Description": "ELB net/norn-probe-nlb/a8f2a5df66e7697a",
+     "Groups": [
+      {
+       "GroupId": "sg-0d8b6450b93ef5058",
+       "GroupName": "norn-probe-nlb"
+      }
+     ],
+     "InterfaceType": "network_load_balancer",
+     "Ipv6Addresses": [],
+     "MacAddress": "02:ff:e3:44:4f:41",
+     "NetworkInterfaceId": "eni-0411618d5d41ff03d",
+     "Operator": {
+      "HiddenByDefault": false,
+      "Managed": false
+     },
+     "OwnerId": "111122223333",
+     "PrivateDnsName": "ip-10-240-0-37.ec2.internal",
+     "PrivateIpAddress": "10.240.0.37",
+     "PrivateIpAddresses": [
+      {
+       "Primary": true,
+       "PrivateDnsName": "ip-10-240-0-37.ec2.internal",
+       "PrivateIpAddress": "10.240.0.37"
+      }
+     ],
+     "PublicDnsName": "",
+     "RequesterId": "803465164726",
+     "RequesterManaged": true,
+     "SourceDestCheck": false,
+     "Status": "in-use",
+     "SubnetId": "subnet-06e4ce49d9ff9b58d",
+     "TagSet": [],
+     "VpcId": "vpc-03fdce0a29dd1833c"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "addresses.private-ip-address",
+     "Values": [
+      "10.241.0.203"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "NetworkInterfaces": [
+    {
+     "Attachment": {
+      "AttachmentId": "ela-attach-082cb63d0a53ec459",
+      "DeleteOnTermination": false,
+      "DeviceIndex": 1,
+      "InstanceOwnerId": "amazon-aws",
+      "Status": "attached"
+     },
+     "AvailabilityZone": "us-east-1d",
+     "AvailabilityZoneId": "use1-az2",
+     "Description": "VPC Endpoint Interface vpce-0eaefa3559130b3d3",
+     "Groups": [
+      {
+       "GroupId": "sg-00d12b0856cfb3246",
+       "GroupName": "norn-probe-endpoint"
+      }
+     ],
+     "InterfaceType": "vpc_endpoint",
+     "Ipv6Addresses": [],
+     "MacAddress": "12:ff:e4:f1:d9:69",
+     "NetworkInterfaceId": "eni-052bcf521b0a12e62",
+     "Operator": {
+      "HiddenByDefault": false,
+      "Managed": false
+     },
+     "OwnerId": "111122223333",
+     "PrivateDnsName": "ip-10-241-0-203.ec2.internal",
+     "PrivateIpAddress": "10.241.0.203",
+     "PrivateIpAddresses": [
+      {
+       "Primary": true,
+       "PrivateDnsName": "ip-10-241-0-203.ec2.internal",
+       "PrivateIpAddress": "10.241.0.203"
+      }
+     ],
+     "PublicDnsName": "",
+     "RequesterId": "727180483921",
+     "RequesterManaged": true,
+     "SourceDestCheck": true,
+     "Status": "in-use",
+     "SubnetId": "subnet-0e4879a283fb8b9f8",
+     "TagSet": [],
+     "VpcId": "vpc-09d2120b203c749de"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "association.public-ip",
+     "Values": [
+      "10.241.0.203"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "NetworkInterfaces": []
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "addresses.private-ip-address",
+     "Values": [
+      "10.241.0.203"
+     ]
+    },
+    {
+     "Name": "vpc-id",
+     "Values": [
+      "vpc-09d2120b203c749de"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "NetworkInterfaces": [
+    {
+     "Attachment": {
+      "AttachmentId": "ela-attach-082cb63d0a53ec459",
+      "DeleteOnTermination": false,
+      "DeviceIndex": 1,
+      "InstanceOwnerId": "amazon-aws",
+      "Status": "attached"
+     },
+     "AvailabilityZone": "us-east-1d",
+     "AvailabilityZoneId": "use1-az2",
+     "Description": "VPC Endpoint Interface vpce-0eaefa3559130b3d3",
+     "Groups": [
+      {
+       "GroupId": "sg-00d12b0856cfb3246",
+       "GroupName": "norn-probe-endpoint"
+      }
+     ],
+     "InterfaceType": "vpc_endpoint",
+     "Ipv6Addresses": [],
+     "MacAddress": "12:ff:e4:f1:d9:69",
+     "NetworkInterfaceId": "eni-052bcf521b0a12e62",
+     "Operator": {
+      "HiddenByDefault": false,
+      "Managed": false
+     },
+     "OwnerId": "111122223333",
+     "PrivateDnsName": "ip-10-241-0-203.ec2.internal",
+     "PrivateIpAddress": "10.241.0.203",
+     "PrivateIpAddresses": [
+      {
+       "Primary": true,
+       "PrivateDnsName": "ip-10-241-0-203.ec2.internal",
+       "PrivateIpAddress": "10.241.0.203"
+      }
+     ],
+     "PublicDnsName": "",
+     "RequesterId": "727180483921",
+     "RequesterManaged": true,
+     "SourceDestCheck": true,
+     "Status": "in-use",
+     "SubnetId": "subnet-0e4879a283fb8b9f8",
+     "TagSet": [],
+     "VpcId": "vpc-09d2120b203c749de"
+    }
+   ]
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "association.public-ip",
+     "Values": [
+      "10.241.0.203"
+     ]
+    },
+    {
+     "Name": "vpc-id",
+     "Values": [
+      "vpc-09d2120b203c749de"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "NetworkInterfaces": []
+  }
+ },
+ {
+  "params": {
+   "Filters": [
+    {
+     "Name": "subnet-id",
+     "Values": [
+      "subnet-0560b85d7fd3bda77"
+     ]
+    }
+   ]
+  },
+  "response": {
+   "NetworkInterfaces": [
+    {
+     "Attachment": {
+      "AttachTime": "2026-11-15 13:47:15+00:00",
+      "AttachmentId": "eni-attach-0aeca3c9a8bd7e0e9",
+      "DeleteOnTermination": true,
+      "DeviceIndex": 0,
+      "InstanceId": "i-0f5617c4b24899e7f",
+      "InstanceOwnerId": "111122223333",
+      "NetworkCardIndex": 0,
+      "Status": "attached"
+     },
+     "AvailabilityZone": "us-east-1d",
+     "AvailabilityZoneId": "use1-az2",
+     "Description": "",
+     "Groups": [
+      {
+       "GroupId": "sg-05bdfe63faefebc24",
+       "GroupName": "norn-probe-client"
+      }
+     ],
+     "InterfaceType": "interface",
+     "Ipv6Addresses": [],
+     "MacAddress": "12:ff:ec:47:ca:dd",
+     "NetworkInterfaceId": "eni-0383151fa0d34bc3c",
+     "Operator": {
+      "HiddenByDefault": false,
+      "Managed": false
+     },
+     "OwnerId": "111122223333",
+     "PrivateDnsName": "ip-10-240-0-174.ec2.internal",
+     "PrivateIpAddress": "10.240.0.174",
+     "PrivateIpAddresses": [
+      {
+       "Primary": true,
+       "PrivateDnsName": "ip-10-240-0-174.ec2.internal",
+       "PrivateIpAddress": "10.240.0.174"
+      }
+     ],
+     "PublicDnsName": "",
+     "RequesterManaged": false,
+     "SourceDestCheck": true,
+     "Status": "in-use",
+     "SubnetId": "subnet-0560b85d7fd3bda77",
+     "TagSet": [],
+     "VpcId": "vpc-03fdce0a29dd1833c"
+    },
+    {
+     "Attachment": {
+      "AttachmentId": "ela-attach-056d5c3cbbc5f82f8",
+      "DeleteOnTermination": false,
+      "DeviceIndex": 1,
+      "InstanceOwnerId": "amazon-aws",
+      "Status": "attached"
+     },
+     "AvailabilityZone": "us-east-1d",
+     "AvailabilityZoneId": "use1-az2",
+     "Description": "ELB net/norn-probe-nlb/a8f2a5df66e7697a",
+     "Groups": [
+      {
+       "GroupId": "sg-0d8b6450b93ef5058",
+       "GroupName": "norn-probe-nlb"
+      }
+     ],
+     "InterfaceType": "network_load_balancer",
+     "Ipv6Addresses": [],
+     "MacAddress": "12:ff:c2:97:a0:81",
+     "NetworkInterfaceId": "eni-0d03c48317897f23f",
+     "Operator": {
+      "HiddenByDefault": false,
+      "Managed": false
+     },
+     "OwnerId": "111122223333",
+     "PrivateDnsName": "ip-10-240-0-153.ec2.internal",
+     "PrivateIpAddress": "10.240.0.153",
+     "PrivateIpAddresses": [
+      {
+       "Primary": true,
+       "PrivateDnsName": "ip-10-240-0-153.ec2.internal",
+       "PrivateIpAddress": "10.240.0.153"
+      }
+     ],
+     "PublicDnsName": "",
+     "RequesterId": "762112775527",
+     "RequesterManaged": true,
+     "SourceDestCheck": false,
+     "Status": "in-use",
+     "SubnetId": "subnet-0560b85d7fd3bda77",
+     "TagSet": [],
+     "VpcId": "vpc-03fdce0a29dd1833c"
+    }
+   ]
   }
  }
 ]

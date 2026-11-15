@@ -2,7 +2,7 @@
  {
   "params": {
    "ServiceNames": [
-    "com.amazonaws.vpce.us-east-1.vpce-svc-0283315b65cb4a056"
+    "com.amazonaws.vpce.us-east-1.vpce-svc-025b9f78f6d781a10"
    ]
   },
   "response": {
@@ -18,12 +18,12 @@
       "us-east-1d"
      ],
      "BaseEndpointDnsNames": [
-      "vpce-svc-0283315b65cb4a056.us-east-1.vpce.amazonaws.com"
+      "vpce-svc-025b9f78f6d781a10.us-east-1.vpce.amazonaws.com"
      ],
      "ManagesVpcEndpoints": false,
      "Owner": "111122223333",
-     "ServiceId": "vpce-svc-0283315b65cb4a056",
-     "ServiceName": "com.amazonaws.vpce.us-east-1.vpce-svc-0283315b65cb4a056",
+     "ServiceId": "vpce-svc-025b9f78f6d781a10",
+     "ServiceName": "com.amazonaws.vpce.us-east-1.vpce-svc-025b9f78f6d781a10",
      "ServiceRegion": "us-east-1",
      "ServiceType": [
       {
@@ -43,7 +43,7 @@
     }
    ],
    "ServiceNames": [
-    "com.amazonaws.vpce.us-east-1.vpce-svc-0283315b65cb4a056"
+    "com.amazonaws.vpce.us-east-1.vpce-svc-025b9f78f6d781a10"
    ]
   }
  }

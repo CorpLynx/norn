@@ -1,7 +1,7 @@
 [
  {
   "params": {
-   "LoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/0ee921ee073cc5f5"
+   "LoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/norn-probe-nlb/a8f2a5df66e7697a"
   },
   "response": {
    "Attributes": [
@@ -11,7 +11,7 @@
     },
     {
      "Key": "load_balancing.cross_zone.enabled",
-     "Value": "false"
+     "Value": "true"
     },
     {
      "Key": "access_logs.s3.enabled",

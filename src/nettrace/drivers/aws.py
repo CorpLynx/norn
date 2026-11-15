@@ -674,7 +674,7 @@ class AwsWalker:
         return StepResult(hops, flow, outcome=Outcome.INCOMPLETE, reason=f"unsupported route target {target}")
 
     def _deliver_local(self, acct: str, region: str, vpc_id: str, from_subnet: str | None, flow: Flow,
-                       hops: list[Hop], warnings: list[str]) -> StepResult:
+                       hops: list[Hop], warnings: list[str], *, preserved_via: dict[str, Any] | None = None) -> StepResult:
         # Same account first, then other accounts in the region (shared VPC subnets via RAM).
         hit = self.env.find_eni(flow.dst, only=self._same_region(acct, region), vpc_id=vpc_id)
         if not hit:
@@ -685,7 +685,15 @@ class AwsWalker:
         if not self._cross(dacct, dregion, flow, from_subnet, eni["SubnetId"], hops, warnings):
             return StepResult(hops, flow, outcome=Outcome.BLOCKED, reason="NACL blocks delivery to destination subnet")
         src_eni = self._peer_eni(flow.src, dacct, dregion)
-        if not self._sg_check(dacct, dregion, eni, flow, egress=False, peer_eni=src_eni, hops=hops):
+        if preserved_via is not None and eni.get("Groups") and eni["NetworkInterfaceId"] not in self.stateful_replies:
+            verdict = self._sg_ingress_preserved_nlb(dacct, dregion, eni, flow, src_eni, preserved_via, hops)
+            if verdict is None:
+                return StepResult(hops, flow, outcome=Outcome.INCOMPLETE,
+                                  reason=f"security group on {eni['NetworkInterfaceId']}: only the NLB node address would be allowed")
+            if not verdict:
+                return StepResult(hops, flow, outcome=Outcome.BLOCKED,
+                                  reason=f"security group on {eni['NetworkInterfaceId']} blocks ingress")
+        elif not self._sg_check(dacct, dregion, eni, flow, egress=False, peer_eni=src_eni, hops=hops):
             return StepResult(hops, flow, outcome=Outcome.BLOCKED, reason=f"security group on {eni['NetworkInterfaceId']} blocks ingress")
         kind = special_eni(eni)
         if kind == "endpoint":
@@ -1054,15 +1062,17 @@ class AwsWalker:
                     info.append("security group inbound rules are not enforced for PrivateLink traffic "
                                 "(EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic=off)")
                 elif enforce == "on":
-                    ep_ip = endpoint_eni.get("PrivateIpAddress") or flow.src
-                    if not self._sg_check(owner, region, node_eni, flow.with_changes(src=ep_ip, dst=node_ip or flow.dst),
-                                          egress=False, peer_eni=endpoint_eni, hops=hops):
-                        hop = hops[-1]  # AWS does not document the address inbound rules see for PrivateLink traffic
-                        hop.status = Status.UNKNOWN
-                        hop.summary += f" (judged on the endpoint address {ep_ip}; not certain for PrivateLink traffic)"
-                        return StepResult(hops, flow, outcome=Outcome.INCOMPLETE,
-                                          reason=f"security group of NLB {name} denies the endpoint address {ep_ip}; "
-                                                 "which address it sees for PrivateLink traffic is not documented")
+                    if node_id in self.stateful_replies:
+                        ok = self._sg_check(owner, region, node_eni, flow.with_changes(
+                            src=endpoint_eni.get("PrivateIpAddress") or flow.src, dst=node_ip or flow.dst),
+                            egress=False, peer_eni=endpoint_eni, hops=hops)
+                        if not ok:
+                            return StepResult(hops, flow, outcome=Outcome.BLOCKED,
+                                              reason=f"security group on NLB node {node_id} blocks ingress")
+                    else:
+                        res = self._sg_privatelink_inbound(owner, region, node_eni, endpoint_eni, flow, name, hops)
+                        if res is not None:
+                            return res
                 else:
                     return unknown(f"NLB {name} has security groups but does not report whether it enforces inbound "
                                    "rules on PrivateLink traffic")
@@ -1110,6 +1120,80 @@ class AwsWalker:
         warnings.extend(f"{name}: {w}" for w in warn)
         return self._at_target_group(owner, region, lb, node_eni, tg_arn, flow, hops, warnings,
                                      privatelink=endpoint_eni is not None)
+
+    def _sg_privatelink_inbound(self, acct: str, region: str, node_eni: dict[str, Any], endpoint_eni: dict[str, Any],
+                                flow: Flow, name: str, hops: list[Hop]) -> StepResult | None:
+        """Inbound security group rules of an NLB for PrivateLink traffic. Live (D21, 2026-11-15): a rule that allows
+        only the consumer VPC CIDR let the traffic in; a rule that allows only the provider VPC CIDR (where the NLB
+        nodes are) did not. So the rules see a consumer-side address, never the NLB node's. Whether that is the endpoint
+        ENI's address or the client's was not told apart (both were in the consumer CIDR), so both are judged: allowed
+        by both is PASS, denied by both is BLOCK (only when the client is in the endpoint's own VPC, the only case
+        measured), anything else is UNKNOWN. Returns None to continue."""
+        node_id = node_eni["NetworkInterfaceId"]
+        ep_ip = endpoint_eni.get("PrivateIpAddress") or flow.src
+        client = self._peer_eni(flow.src, acct, region)
+        same_vpc = bool(client) and client.get("VpcId") == endpoint_eni.get("VpcId")
+        groups = self.env.security_groups(acct, region, [g["GroupId"] for g in node_eni.get("Groups", [])])
+        sg_ids = ",".join(g["GroupId"] for g in groups)
+        to_node = flow.with_changes(dst=node_eni.get("PrivateIpAddress") or flow.dst)
+        d_ep = evaluate_sg(self.env, acct, region, groups, egress=False, peer_ip=ep_ip,
+                           peer_sgs={g["GroupId"] for g in endpoint_eni.get("Groups", [])}, flow=to_node)
+        d_cl = evaluate_sg(self.env, acct, region, groups, egress=False, peer_ip=flow.src,
+                           peer_sgs={g["GroupId"] for g in (client or {}).get("Groups", [])}, flow=to_node)
+        both_allow, both_deny = d_ep.allowed and d_cl.allowed, not d_ep.allowed and not d_cl.allowed
+        status = Status.PASS if both_allow else Status.BLOCK if (both_deny and same_vpc) else Status.UNKNOWN
+        what = ("allowed" if both_allow else "DENIED" if both_deny else "judged differently")
+        hop = self._hop(acct, "security-group", sg_ids, status,
+                        f"ingress {what} from the endpoint address {ep_ip} / client {flow.src} (PrivateLink)",
+                        ingress=node_eni["NetworkInterfaceId"],
+                        policy=f"endpoint address: {d_ep.detail}; client address: {d_cl.detail}", vpc=node_eni.get("VpcId"),
+                        details=["live probe: the NLB's inbound rules saw a consumer-side address (a rule for the consumer "
+                                 "CIDR allowed the traffic, a rule for the provider CIDR did not); endpoint-ENI address vs "
+                                 "client address not told apart, so both are judged"])
+        hops.append(hop)
+        if status is Status.PASS:
+            return None
+        if status is Status.BLOCK:
+            return StepResult(hops, flow, outcome=Outcome.BLOCKED,
+                              reason=f"security group on NLB node {node_id} blocks ingress of PrivateLink traffic "
+                                     f"(neither the endpoint address {ep_ip} nor the client {flow.src} is allowed)")
+        return StepResult(hops, flow, outcome=Outcome.INCOMPLETE,
+                          reason=f"security group of NLB {name} judges the endpoint address {ep_ip} and the client "
+                                 f"{flow.src} differently"
+                                 + ("" if same_vpc else ", and the client is not in the endpoint's VPC (only that case was measured)"))
+
+    def _sg_ingress_preserved_nlb(self, acct: str, region: str, eni: dict[str, Any], flow: Flow,
+                                  client_eni: dict[str, Any] | None, node_eni: dict[str, Any], hops: list[Hop]) -> bool | None:
+        """Target ingress when an NLB with security groups forwards with the client address preserved. Live (D21): the
+        target saw the client's address, yet a rule that references the NLB's security group allowed the traffic. So a
+        rule is judged on the client's address (as before) and also by reference to the NLB's groups (proven). A rule that
+        only the NLB node's address would match (a CIDR) is not proven either way: UNKNOWN. Returns True/False, or None
+        for UNKNOWN (the hop is recorded as UNKNOWN)."""
+        sg_ids = [g["GroupId"] for g in eni.get("Groups", [])]
+        groups = self.env.security_groups(acct, region, sg_ids)
+        node_sgs = {g["GroupId"] for g in node_eni.get("Groups", [])}
+        client_sgs = {g["GroupId"] for g in (client_eni or {}).get("Groups", [])}
+        d = evaluate_sg(self.env, acct, region, groups, egress=False, peer_ip=flow.src, peer_sgs=client_sgs, flow=flow)
+        note = None
+        if not d.allowed:
+            d2 = evaluate_sg(self.env, acct, region, groups, egress=False, peer_ip=flow.src, peer_sgs=client_sgs | node_sgs,
+                             flow=flow)
+            if d2.allowed:
+                d, note = d2, ("allowed by a rule that references the NLB's security group: live, the NLB's group is "
+                               "honoured although the target sees the client address")
+        status = Status.PASS if d.allowed else Status.BLOCK
+        if not d.allowed:
+            d3 = evaluate_sg(self.env, acct, region, groups, egress=False, peer_ip=node_eni.get("PrivateIpAddress") or flow.src,
+                             peer_sgs=node_sgs, flow=flow)
+            if d3.allowed:
+                status, note = Status.UNKNOWN, (f"only the NLB node address {node_eni.get('PrivateIpAddress')} would be "
+                                                f"allowed ({d3.detail}); not known whether AWS judges that or the client address")
+        hops.append(self._hop(acct, "security-group", ",".join(sg_ids), status,
+                              f"ingress {'allowed' if d.allowed else 'DENIED' if status is Status.BLOCK else 'UNCERTAIN'} "
+                              f"from {flow.src}" + (" (client address preserved by the NLB)"),
+                              ingress=eni["NetworkInterfaceId"], policy=d.detail, vpc=eni.get("VpcId"),
+                              details=[note] if note else []))
+        return None if status is Status.UNKNOWN else d.allowed
 
     def _at_target_group(self, owner: str, region: str, lb: dict[str, Any], node_eni: dict[str, Any], tg_arn: str,
                          flow: Flow, hops: list[Hop], warnings: list[str], *, privatelink: bool) -> StepResult:
@@ -1189,7 +1273,8 @@ class AwsWalker:
         info.append(f"target type {ttype}, preserve_client_ip.enabled={preserve}")
         if privatelink:
             info.append("PrivateLink traffic: the target sees the NLB node address, not the client; AWS does not "
-                        "preserve the client address through an endpoint, whatever the target group attribute says")
+                        "preserve the client address through an endpoint, whatever the target group attribute says "
+                        "(confirmed live, D21)")
         cz = attrs.get("load_balancing.cross_zone.enabled")
         if cz not in ("true", "false"):  # use_load_balancer_configuration: the NLB's own setting decides
             cz = self._attributes(owner, region, "describe_load_balancer_attributes",
@@ -1212,7 +1297,8 @@ class AwsWalker:
         if not self._sg_check(owner, region, node_eni, new_flow, egress=True, peer_eni=peer, hops=hops):
             return StepResult(hops, new_flow, outcome=Outcome.BLOCKED,
                               reason=f"security group on NLB node {node_id} blocks egress to the target")
-        res = self._deliver_local(owner, region, vpc_id, node_eni["SubnetId"], new_flow, hops, warnings)
+        res = self._deliver_local(owner, region, vpc_id, node_eni["SubnetId"], new_flow, hops, warnings,
+                                  preserved_via=node_eni if keep and node_eni.get("Groups") else None)
         if res.outcome == Outcome.REACHABLE:
             res.reason += f" via NLB {name} ({'PrivateLink' if privatelink else 'direct'})"
         return res

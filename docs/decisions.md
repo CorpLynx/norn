@@ -19,7 +19,7 @@ the NLB ARNs). Reachability Analyzer and Network Access Analyzer are still not u
 - **What the code relies on** (AWS documentation: *Elastic Load Balancing, Network Load Balancers: target groups, client IP
   preservation, security groups*; *AWS PrivateLink: concepts, endpoint services, interface endpoints*; EC2 API reference
   for `DescribeVpcEndpointServices` / `DescribeVpcEndpointServiceConfigurations` and the ELB v2 API reference; recalled from
-  those documents, not re-read during the build, and never run against a real account):
+  those documents, not re-read during the build, and then checked against real accounts and real traffic, see below):
   - The interface endpoint ENI has `InterfaceType` `vpc_endpoint` and the description `VPC Endpoint Interface vpce-...`; an NLB
     node ENI has `network_load_balancer` and `ELB net/<name>/<id>`. `DescribeVpcEndpointServices` returns `Owner` (an account id,
     or `amazon` for AWS services) and `ServiceId`; the owner's `DescribeVpcEndpointServiceConfigurations` returns
@@ -36,9 +36,9 @@ the NLB ARNs). Reachability Analyzer and Network Access Analyzer are still not u
     ("no listener on <proto>/<port>"). NLB listeners have a single forward default action.
   - NLB security groups: evaluated (ingress on the node ENI, and egress to the target) for direct traffic. For PrivateLink the
     load balancer field `EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic` (`on`/`off`) decides whether inbound rules apply;
-    `off` skips them (stated on the hop), `on` evaluates them against the endpoint ENI address. AWS does not document which
-    address inbound rules see for PrivateLink traffic, so a DENY there is UNKNOWN, an allow is PASS, and a missing field when the
-    NLB has security groups is UNKNOWN. Outbound rules are assumed to apply to traffic towards the target either way.
+    `off` skips them (stated on the hop), `on` evaluates them (see the traffic test below: they see a consumer-side address),
+    and a missing field when the NLB has security groups is UNKNOWN. Outbound rules are assumed to apply to traffic towards
+    the target either way.
   - Target health: only `healthy` targets are preferred. With none healthy the NLB fails open (sends to all targets), so the trace
     follows the first target and WARNs. No registered target is a BLOCK.
   - Cross-zone: with it off a node sends only to targets in its own zone; a target in another zone is a WARN (and says if the NLB
@@ -54,10 +54,38 @@ the NLB ARNs). Reachability Analyzer and Network Access Analyzer are still not u
   is an empty list for an internal NLB without static private IPs, so the node address was never found and every PrivateLink
   trace ended INCOMPLETE. The node is now the NLB's own ENI in the endpoint's subnet (found by `subnet-id` and the `ELB net/<name>/`
   description; ambiguous or none is UNKNOWN); `LoadBalancerAddresses` is still used when AWS reports it. The demo lab and
-  simulator now answer the empty list too. **Not verifiable without sending traffic** (no packets were sent): which source address
-  the NLB's inbound rules and the target's security group see for PrivateLink traffic (the code assumes the endpoint ENI address
-  for the NLB's rules and the node for the target's), and a direct trace to a node with preservation on blocks when the target
-  security group only allows the NLB's security group (preserved client address is judged; matches the documentation).
+  simulator now answer the empty list too. The questions that needed traffic are answered in the next item.
+- **Checked with real traffic (2026-11-15, second throwaway probe, same account, 20 minutes live, three `t4g.nano` instances).**
+  Provider VPC 10.240.0.0/24, consumer VPC 10.241.0.0/24, no internet. A target (Python server on 8080/8081 logging each
+  peer address to the serial console), an internal NLB with its own security group (ingress 80-82 from both VPCs, 83 from the
+  consumer VPC only, 84 from the provider VPC only; egress to the provider VPC), instance target groups behind listeners 80
+  (`tg-pre`, preserve client IP on), 81 (`tg-nopre`, off), 83 (`tg-83`) and 84 (`tg-84`), the target's security group allowing
+  8080-8081 only from the NLB's security group, an endpoint service, an interface endpoint in the consumer VPC, a client A in
+  the provider VPC (az2) and a client B in the consumer VPC. Results come from `get-console-output` only; fixtures and the
+  console lines are in `tests/fixtures/aws_live/privatelink{,_console}/`, replayed by `tests/test_aws_live_privatelink.py`.
+  - **Q1** (direct to an NLB, preservation on, target allows only the NLB's group): A to port 80 got `200` in 15 of 15 rounds,
+    and the target logged every request. Norn said BLOCKED at the target's security group: **wrong**. A security-group rule that
+    references the NLB's group is honoured although the target sees the client's address. Fixed: the target's ingress is judged
+    on the client address as before and also by reference to the NLB's groups (PASS, stated on the hop). A deny that only the
+    NLB node's address would satisfy (a CIDR) is not proven, so it is UNKNOWN; nothing allowing either is BLOCK.
+  - **Q4** (direct, preservation on): the 15 requests reached the target with `src=10.240.0.174`, client A's own address. Norn's
+    "client address preserved" was right.
+  - **Control** (port 81, preservation off): `200` in 15 of 15 rounds, target `src=10.240.0.153`, an NLB node (A's own zone).
+    Norn's SNAT to the node was right.
+  - **Q2** (PrivateLink, source seen by the target): B to port 80 got `200` in 11 of 11 rounds and the target saw
+    `src=10.240.0.153`, an NLB node, never B (`10.241.0.7`) and never the endpoint ENI. The code already did this; now confirmed.
+    The target never logged the other node (`10.240.0.37`) in 52 requests, so which node serves which endpoint zone is not
+    settled (B resolved the endpoint's regional name and may have used either ENI; the code keeps the endpoint's own zone).
+  - **Q3** (PrivateLink, address the NLB's inbound rules see): port 83 (rule for the consumer CIDR only) `200` in 11 of 11;
+    port 84 (rule for the provider CIDR only, where the nodes are) `000` in 11 of 11. So the rules see a consumer-side address:
+    not the node's and not a provider-side one. **Not told apart:** the endpoint ENI's address (10.241.0.73/.203) or the
+    client's (10.241.0.7), both in 10.241.0.0/24. Decision: judge both. Allowed by both is PASS; denied by both is BLOCK, but only
+    when the client is in the endpoint's own VPC (the only case measured); anything else, including one candidate allowed and
+    the other denied, stays UNKNOWN. Before, every deny was UNKNOWN ("not documented"). Norn's B to 84 was INCOMPLETE and is now
+    BLOCKED; B to 83 stays REACHABLE.
+  - Still unproven, so still UNKNOWN: a client in another VPC or account reaching the endpoint (peering, TGW), a target rule
+    that only matches the node's address by CIDR, NACLs on the NLB subnet for the PrivateLink leg, IP-type target groups,
+    several targets or zones.
 - **Never guess, here.** Several NLBs behind a service, several weighted target groups, several targets: follow the first, WARN
   listing all (hop status WARN, `warnings`), same as TGW ECMP. An owner account outside the inventory, a gateway load balancer
   service, an `alb`/`lambda` target group, an IP target outside the VPC (`AvailabilityZone` `all`), a non-TCP/UDP protocol, no
