@@ -1,5 +1,5 @@
 """AWS: ENIs, security groups, NACLs, VPC route tables, Transit Gateways, GWLB endpoints,
-NAT gateways, VPC peering. Multi-account via sts:AssumeRole. Exact read-only allowlist (readonly.py).
+NAT gateways, VPC peering, PrivateLink interface endpoints and Network Load Balancers. Multi-account via sts:AssumeRole. Exact read-only allowlist (readonly.py).
 """
 
 from __future__ import annotations
@@ -439,6 +439,27 @@ def route_target(route: dict[str, Any]) -> tuple[str, str]:
     return "unknown", gw or "?"
 
 
+_VPCE_ID = re.compile(r"\bvpce-[0-9a-f]+\b")
+_NLB_DESC = re.compile(r"ELB net/([^/\s]+)/([0-9a-f]+)$")
+
+
+def special_eni(eni: dict[str, Any]) -> str | None:
+    """"endpoint" for an interface VPC endpoint ENI, "nlb" for a Network Load Balancer node ENI, else None.
+    Gateway load balancer endpoints share the endpoint description but have their own interface type: not touched."""
+    itype, desc = eni.get("InterfaceType"), eni.get("Description") or ""
+    if itype == "vpc_endpoint" or (itype in (None, "interface") and desc.startswith("VPC Endpoint Interface")):
+        return "endpoint"
+    if itype == "network_load_balancer" or (itype in (None, "interface") and _NLB_DESC.match(desc)):
+        return "nlb"
+    return None
+
+
+def _arn_name(arn: str) -> str:
+    """The name inside a target group / load balancer ARN (...:targetgroup/<name>/<id>)."""
+    parts = arn.split("/")
+    return parts[1] if len(parts) >= 3 else arn
+
+
 # ==== walker ======================================================================================
 class AwsWalker:
     """Walks a flow through AWS until it is delivered, blocked, leaves AWS, or reaches a firewall."""
@@ -455,6 +476,7 @@ class AwsWalker:
         self._region: str | None = None  # where the walk currently is; used for hop locations
         self._vpc: str | None = None
         self._tgw_entries: set[tuple[str, str, str]] = set()  # (attachment, src, dst) VPC entries from a TGW
+        self._lb_seen: set[str] = set()  # NLB ARNs entered during this walk (a target can be another NLB: loop guard)
 
     def _at(self, region: str | None, vpc: str | None) -> None:
         self._region, self._vpc = region, vpc
@@ -561,6 +583,7 @@ class AwsWalker:
         hops: list[Hop] = []
         warnings: list[str] = []
         self._mark = len(self.env.evidence)
+        self._lb_seen = set()
         result = self._walk(at, flow, hops, warnings)
         result.warnings = warnings + result.warnings
         return result
@@ -664,6 +687,11 @@ class AwsWalker:
         src_eni = self._peer_eni(flow.src, dacct, dregion)
         if not self._sg_check(dacct, dregion, eni, flow, egress=False, peer_eni=src_eni, hops=hops):
             return StepResult(hops, flow, outcome=Outcome.BLOCKED, reason=f"security group on {eni['NetworkInterfaceId']} blocks ingress")
+        kind = special_eni(eni)
+        if kind == "endpoint":
+            return self._at_interface_endpoint(dacct, dregion, eni, flow, hops, warnings)
+        if kind == "nlb":
+            return self._at_nlb_eni(dacct, dregion, eni, flow, hops, warnings)
         desc = eni.get("Description") or eni.get("InterfaceType") or ""
         owner = eni.get("Attachment", {}).get("InstanceId") or desc
         hops.append(self._hop(dacct, "eni", eni["NetworkInterfaceId"], Status.PASS,
@@ -852,6 +880,332 @@ class AwsWalker:
             return StepResult(hops, flow, outcome=Outcome.INCOMPLETE,
                               reason=f"route goes to appliance {instance_id or target}; add it to the inventory with aws.instance_id")
         return StepResult(hops, flow, next=DeviceAt(device=device.name, arrival_ip=ip))
+
+    # ---- PrivateLink and Network Load Balancers (D21) -------------------------------------------------
+    # A trace that ends at an interface endpoint ENI or an NLB node ENI keeps going: endpoint -> endpoint service
+    # (owner account) -> NLB -> listener -> target group -> target -> target ENI. Every read goes through AwsEnv.call.
+    def _stop(self, acct: str, component: str, node: str, status: Status, summary: str, hops: list[Hop], flow: Flow,
+              outcome: Outcome, reason: str, **kw: Any) -> StepResult:
+        hops.append(self._hop(acct, component, node, status, summary, **kw))
+        return StepResult(hops, flow, outcome=outcome, reason=reason)
+
+    def _elb(self, acct: str, region: str, op: str, **params: Any) -> dict[str, Any]:
+        return self.env.call(acct, region, op, service="elbv2", **params)
+
+    def _attributes(self, acct: str, region: str, op: str, **params: Any) -> dict[str, str]:
+        return {a["Key"]: a["Value"] for a in self._elb(acct, region, op, **params).get("Attributes", [])}
+
+    def _at_interface_endpoint(self, acct: str, region: str, eni: dict[str, Any], flow: Flow, hops: list[Hop],
+                               warnings: list[str]) -> StepResult:
+        """The flow was delivered to an interface endpoint ENI (its security group has passed): follow it to the
+        endpoint service, its owner account and the NLB behind it."""
+        eni_id = eni["NetworkInterfaceId"]
+
+        def unknown(node: str, why: str) -> StepResult:
+            return self._stop(acct, "interface-endpoint", node, Status.UNKNOWN, why, hops, flow, Outcome.INCOMPLETE,
+                              why, ingress=eni_id)
+
+        found = _VPCE_ID.search(eni.get("Description") or "")
+        if not found:
+            return unknown(eni_id, f"{eni_id} is an endpoint ENI but its description names no VPC endpoint, "
+                                   "so the endpoint service cannot be found")
+        vpce = found.group(0)
+        eps = self.env.call(acct, region, "describe_vpc_endpoints", VpcEndpointIds=[vpce]).get("VpcEndpoints", [])
+        if not eps:
+            return unknown(vpce, f"{vpce} is not visible in account {acct}")
+        ep = eps[0]
+        svc_name = ep.get("ServiceName") or ""
+        if ep.get("VpcEndpointType") != "Interface":
+            return unknown(vpce, f"{vpce} is a {ep.get('VpcEndpointType')} endpoint; only interface endpoints are followed")
+        if eni_id not in (ep.get("NetworkInterfaceIds") or []):
+            return unknown(vpce, f"{vpce} does not list {eni_id} among its network interfaces")
+        state = ep.get("State")
+        if state in ("pendingAcceptance", "rejected", "failed", "expired", "deleting", "deleted"):
+            return self._stop(acct, "interface-endpoint", vpce, Status.BLOCK, f"endpoint is {state}", hops, flow,
+                              Outcome.BLOCKED, f"{vpce} is {state}", ingress=eni_id, egress=svc_name)
+        if state != "available":
+            return unknown(vpce, f"{vpce} is {state or 'in an unknown state'}")
+        if ep.get("ServiceRegion") and ep["ServiceRegion"] != region:
+            return unknown(vpce, f"{svc_name} is in {ep['ServiceRegion']}; cross-region PrivateLink is not followed")
+
+        svcs = self.env.call(acct, region, "describe_vpc_endpoint_services", ServiceNames=[svc_name]).get("ServiceDetails", [])
+        if not svcs:
+            return unknown(vpce, f"endpoint service {svc_name} is not visible, so its owner is unknown")
+        svc = svcs[0]
+        owner, sid = str(svc.get("Owner") or ""), svc.get("ServiceId")
+        types = {t.get("ServiceType") for t in svc.get("ServiceType", [])}
+        details = [f"endpoint {vpce} in {ep.get('VpcId')}, service {svc_name}" + (f" ({sid})" if sid else "")]
+        kw: dict[str, Any] = {"ingress": eni_id, "egress": svc_name}
+        if not owner.isdigit():  # "amazon": an AWS service. Nothing of the customer's lies behind the endpoint.
+            hops.append(self._hop(acct, "interface-endpoint", vpce, Status.INFO,
+                                  f"to AWS service {svc_name} (owner {owner or '?'})", details=details, **kw))
+            return StepResult(hops, flow, outcome=Outcome.REACHABLE,
+                              reason=f"delivered to the interface endpoint {vpce} for {svc_name} (an AWS-owned service)")
+        owner_acct = self.inv.account(owner)
+        details.append(f"service owner {owner_acct.name if owner_acct else owner} ({owner})")
+        if "GatewayLoadBalancer" in types or "Interface" not in types:
+            return self._stop(acct, "interface-endpoint", vpce, Status.UNKNOWN,
+                              f"{svc_name} is not an NLB-backed endpoint service (type {sorted(t for t in types if t) or '?'}); "
+                              "gateway load balancer services are not followed from here", hops, flow, Outcome.INCOMPLETE,
+                              f"endpoint service {svc_name} is not backed by an NLB", details=details, **kw)
+        if owner_acct is None:
+            return self._stop(acct, "interface-endpoint", vpce, Status.UNKNOWN,
+                              f"endpoint service {svc_name} is owned by account {owner}, which is not in the inventory",
+                              hops, flow, Outcome.INCOMPLETE, f"add service owner account {owner} to aws.accounts",
+                              details=details, **kw)
+        cfgs = (self.env.call(owner, region, "describe_vpc_endpoint_service_configurations",
+                              ServiceIds=[sid]).get("ServiceConfigurations", []) if sid else [])
+        if not cfgs:
+            return self._stop(acct, "interface-endpoint", vpce, Status.UNKNOWN,
+                              f"account {owner} returned no configuration for {svc_name}", hops, flow,
+                              Outcome.INCOMPLETE, f"endpoint service configuration of {svc_name} is not readable",
+                              details=details, **kw)
+        cfg = cfgs[0]
+        if cfg.get("ServiceState") != "Available":
+            return self._stop(acct, "interface-endpoint", vpce, Status.BLOCK, f"service is {cfg.get('ServiceState')}",
+                              hops, flow, Outcome.BLOCKED, f"{svc_name} is {cfg.get('ServiceState')}", details=details, **kw)
+        nlbs = cfg.get("NetworkLoadBalancerArns") or []
+        if not nlbs:
+            why = ("gateway load balancer services are not followed" if cfg.get("GatewayLoadBalancerArns")
+                   else "the service lists no network load balancer")
+            return self._stop(acct, "interface-endpoint", vpce, Status.UNKNOWN, f"{svc_name}: {why}", hops, flow,
+                              Outcome.INCOMPLETE, f"{svc_name}: {why}", details=details, **kw)
+        status = Status.INFO
+        if len(nlbs) > 1:
+            status = Status.WARN
+            details.append("several NLBs back this service: " + ", ".join(a.split("/")[-2] for a in nlbs)
+                           + "; following the first")
+            warnings.append(f"{svc_name} is backed by {len(nlbs)} NLBs; nettrace followed {nlbs[0].split('/')[-2]}")
+        hops.append(self._hop(acct, "interface-endpoint", vpce, status,
+                              f"{vpce} -> {svc_name} (PrivateLink, owner {owner_acct.name})", details=details, **kw))
+        found_lbs = self._elb(owner, region, "describe_load_balancers", LoadBalancerArns=[nlbs[0]]).get("LoadBalancers", [])
+        if not found_lbs:
+            return self._stop(owner, "nlb", nlbs[0], Status.UNKNOWN, f"{nlbs[0]} is not visible in account {owner}",
+                              hops, flow, Outcome.INCOMPLETE, f"NLB {nlbs[0]} of {svc_name} is not readable")
+        return self._enter_nlb(owner, region, found_lbs[0], flow, hops, warnings, endpoint_eni=eni)
+
+    def _at_nlb_eni(self, acct: str, region: str, eni: dict[str, Any], flow: Flow, hops: list[Hop],
+                    warnings: list[str]) -> StepResult:
+        """The flow was delivered to an NLB node ENI (its security groups, if any, have passed): normal client-IP rules."""
+        m = _NLB_DESC.match(eni.get("Description") or "")
+        lbs = self._elb(acct, region, "describe_load_balancers", Names=[m.group(1)]).get("LoadBalancers", []) if m else []
+        lb = next((x for x in lbs if x["LoadBalancerArn"].endswith(f"/{m.group(1)}/{m.group(2)}")), None) if m else None
+        if lb is None:
+            return self._stop(acct, "nlb", eni["NetworkInterfaceId"], Status.UNKNOWN,
+                              f"{eni['NetworkInterfaceId']} looks like an NLB node but the load balancer cannot be read",
+                              hops, flow, Outcome.INCOMPLETE, "NLB behind this ENI is not readable",
+                              ingress=eni["NetworkInterfaceId"])
+        return self._enter_nlb(acct, region, lb, flow, hops, warnings, node_eni=eni)
+
+    def _enter_nlb(self, owner: str, region: str, lb: dict[str, Any], flow: Flow, hops: list[Hop], warnings: list[str],
+                   *, node_eni: dict[str, Any] | None = None, endpoint_eni: dict[str, Any] | None = None) -> StepResult:
+        """At an NLB: pick the node, find the listener for the flow's protocol and port, follow its target group.
+        `endpoint_eni` is set for PrivateLink traffic (the node then comes from the endpoint's AZ)."""
+        arn, name = lb["LoadBalancerArn"], lb.get("LoadBalancerName") or lb["LoadBalancerArn"]
+        self._at(region, lb.get("VpcId"))
+
+        def stop(status: Status, summary: str, outcome: Outcome, reason: str, **kw: Any) -> StepResult:
+            return self._stop(owner, "nlb", name, status, summary, hops, flow, outcome, reason, **kw)
+
+        def unknown(why: str, **kw: Any) -> StepResult:
+            return stop(Status.UNKNOWN, why, Outcome.INCOMPLETE, why, **kw)
+
+        if arn in self._lb_seen:
+            return unknown(f"forwarding loop: traffic re-enters NLB {name}")
+        self._lb_seen.add(arn)
+        if lb.get("Type") != "network":
+            return unknown(f"{name} is a {lb.get('Type')} load balancer; only network load balancers are followed")
+        code = (lb.get("State") or {}).get("Code")
+        if code != "active":
+            return unknown(f"NLB {name} is {code or 'in an unknown state'}")
+        warn: list[str] = []
+        info: list[str] = []
+        zones = lb.get("AvailabilityZones") or []
+        if node_eni is None:
+            ep_az = (endpoint_eni or {}).get("AvailabilityZone")
+            zone = next((z for z in zones if z.get("ZoneName") == ep_az), None)
+            if zone is None and zones:
+                zone = zones[0]
+                warn.append(f"the NLB has no subnet in the endpoint's zone {ep_az}; used its node in {zone.get('ZoneName')}")
+            addr = next((a.get("PrivateIPv4Address") for a in (zone or {}).get("LoadBalancerAddresses", [])
+                         if a.get("PrivateIPv4Address")), None)
+            hit = self.env.find_eni(addr, only=[(owner, region)], vpc_id=lb.get("VpcId")) if addr else None
+            if hit is None:
+                return unknown(f"the node address of NLB {name} is not reported or not found as an ENI")
+            node_eni = hit[2]
+        node_id, node_ip = node_eni["NetworkInterfaceId"], node_eni.get("PrivateIpAddress")
+        if endpoint_eni is not None:
+            vpce = _VPCE_ID.search(endpoint_eni.get("Description") or "")
+            info.append(f"reached through interface endpoint {vpce.group(0) if vpce else endpoint_eni['NetworkInterfaceId']}"
+                        f" (PrivateLink) on node {node_ip}")
+            if node_eni.get("Groups"):
+                enforce = lb.get("EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic")
+                if enforce == "off":
+                    info.append("security group inbound rules are not enforced for PrivateLink traffic "
+                                "(EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic=off)")
+                elif enforce == "on":
+                    ep_ip = endpoint_eni.get("PrivateIpAddress") or flow.src
+                    if not self._sg_check(owner, region, node_eni, flow.with_changes(src=ep_ip, dst=node_ip or flow.dst),
+                                          egress=False, peer_eni=endpoint_eni, hops=hops):
+                        hop = hops[-1]  # AWS does not document the address inbound rules see for PrivateLink traffic
+                        hop.status = Status.UNKNOWN
+                        hop.summary += f" (judged on the endpoint address {ep_ip}; not certain for PrivateLink traffic)"
+                        return StepResult(hops, flow, outcome=Outcome.INCOMPLETE,
+                                          reason=f"security group of NLB {name} denies the endpoint address {ep_ip}; "
+                                                 "which address it sees for PrivateLink traffic is not documented")
+                else:
+                    return unknown(f"NLB {name} has security groups but does not report whether it enforces inbound "
+                                   "rules on PrivateLink traffic")
+            info.append("NACLs on the NLB subnet are not evaluated for the client-to-NLB leg of PrivateLink traffic "
+                        "(the address they see is not documented)")
+
+        # listener
+        pnum = protocol_number(flow.protocol)
+        if pnum not in (6, 17):
+            return unknown(f"NLB listeners carry TCP and UDP; {flow.protocol} is not evaluated", ingress=node_id)
+        if not flow.dst_port:
+            return unknown("no destination port given, so the NLB listener cannot be chosen", ingress=node_id)
+        pname = "tcp" if pnum == 6 else "udp"
+        wanted = {"TCP", "TLS", "TCP_UDP", "TCP_QUIC"} if pnum == 6 else {"UDP", "TCP_UDP", "QUIC", "TCP_QUIC"}
+        listeners = self._elb(owner, region, "describe_listeners", LoadBalancerArn=arn).get("Listeners", [])
+        match = [x for x in listeners if x.get("Port") == flow.dst_port and x.get("Protocol") in wanted]
+        if not match:
+            have = ", ".join(sorted(f"{x.get('Protocol')}/{x.get('Port')}" for x in listeners)) or "none"
+            return stop(Status.BLOCK, f"no listener on {pname}/{flow.dst_port}", Outcome.BLOCKED,
+                        f"NLB {name} has no listener on {pname}/{flow.dst_port}", ingress=node_id,
+                        details=info + [f"listeners: {have}"])
+        lis = match[0]
+        if len(match) > 1:
+            warn.append(f"{len(match)} listeners match {pname}/{flow.dst_port}; following the first")
+        actions = lis.get("DefaultActions") or []
+        fwd = next((a for a in sorted(actions, key=lambda a: a.get("Order", 1)) if a.get("Type") == "forward"), None)
+        if fwd is None or len(actions) != 1:
+            return unknown(f"the {lis.get('Protocol')}/{lis.get('Port')} listener's action is not a single forward",
+                           ingress=node_id, details=info)
+        refs = (fwd.get("ForwardConfig") or {}).get("TargetGroups") or (
+            [{"TargetGroupArn": fwd["TargetGroupArn"], "Weight": 1}] if fwd.get("TargetGroupArn") else [])
+        live = [r for r in refs if r.get("Weight", 1) != 0]
+        if not live:
+            return unknown("the listener forwards to no target group with weight above 0", ingress=node_id, details=info)
+        tg_arn = live[0]["TargetGroupArn"]
+        tg_name = _arn_name(tg_arn)
+        if len(refs) > 1:
+            warn.append("weighted target groups: "
+                        + ", ".join(f"{_arn_name(r['TargetGroupArn'])} (weight {r.get('Weight', 1)})" for r in refs)
+                        + f"; following {tg_name}")
+        hops.append(self._hop(owner, "nlb", name, Status.WARN if warn else Status.INFO,
+                              f"listener {lis.get('Protocol')}/{lis.get('Port')} -> target group {tg_name}",
+                              ingress=node_id, egress=tg_name, policy=f"listener {lis.get('Protocol')}:{lis.get('Port')} forward",
+                              details=info + warn))
+        warnings.extend(f"{name}: {w}" for w in warn)
+        return self._at_target_group(owner, region, lb, node_eni, tg_arn, flow, hops, warnings,
+                                     privatelink=endpoint_eni is not None)
+
+    def _at_target_group(self, owner: str, region: str, lb: dict[str, Any], node_eni: dict[str, Any], tg_arn: str,
+                         flow: Flow, hops: list[Hop], warnings: list[str], *, privatelink: bool) -> StepResult:
+        """Pick the target, rewrite the flow (destination NAT to the target, source NAT to the NLB node unless the client
+        address is preserved) and deliver it to the target ENI."""
+        name = lb.get("LoadBalancerName") or lb["LoadBalancerArn"]
+        tg_name = _arn_name(tg_arn)
+        node_id, node_ip = node_eni["NetworkInterfaceId"], node_eni["PrivateIpAddress"]
+
+        def unknown(why: str, **kw: Any) -> StepResult:
+            return self._stop(owner, "target-group", tg_name, Status.UNKNOWN, why, hops, flow, Outcome.INCOMPLETE, why,
+                              ingress=node_id, **kw)
+
+        tgs = self._elb(owner, region, "describe_target_groups", TargetGroupArns=[tg_arn]).get("TargetGroups", [])
+        if not tgs:
+            return unknown(f"target group {tg_arn} is not readable")
+        tg = tgs[0]
+        ttype = tg.get("TargetType")
+        if ttype not in ("instance", "ip"):
+            return unknown(f"{tg_name} has target type {ttype}; only instance and ip targets are followed")
+        attrs = self._attributes(owner, region, "describe_target_group_attributes", TargetGroupArn=tg_arn)
+        preserve = attrs.get("preserve_client_ip.enabled")
+        if preserve not in ("true", "false"):
+            return unknown(f"{tg_name} does not report preserve_client_ip.enabled, so the source address the target "
+                           "sees is unknown")
+        descs = self._elb(owner, region, "describe_target_health", TargetGroupArn=tg_arn).get("TargetHealthDescriptions", [])
+        if not descs:
+            return self._stop(owner, "target-group", tg_name, Status.BLOCK, "no registered targets", hops, flow,
+                              Outcome.BLOCKED, f"target group {tg_name} has no registered targets", ingress=node_id)
+
+        def state(d: dict[str, Any]) -> str:
+            return (d.get("TargetHealth") or {}).get("State", "?")
+
+        def label(d: dict[str, Any]) -> str:
+            t = d["Target"]
+            return f"{t['Id']}:{t.get('Port') or tg.get('Port')} {state(d)}"
+
+        warn: list[str] = []
+        info: list[str] = []
+        healthy = [d for d in descs if state(d) == "healthy"]
+        chosen = (healthy or descs)[0]
+        if len(descs) > 1:
+            warn.append(f"{len(descs)} targets: " + ", ".join(label(d) for d in descs)
+                        + f"; following {chosen['Target']['Id']}")
+        if not healthy:
+            warn.append("no healthy target: the NLB fails open and sends to all targets "
+                        "(" + ", ".join(label(d) for d in descs) + ")")
+        tid = chosen["Target"]["Id"]
+        tport = chosen["Target"].get("Port") or tg.get("Port")
+        taz = chosen["Target"].get("AvailabilityZone")
+        target_eni: dict[str, Any] | None = None
+        if ttype == "instance":
+            enis = self.env.call(owner, region, "describe_network_interfaces",
+                                 Filters=[{"Name": "attachment.instance-id", "Values": [tid]},
+                                          {"Name": "attachment.device-index", "Values": ["0"]}]).get("NetworkInterfaces", [])
+            if not enis:
+                return unknown(f"no primary network interface found for instance {tid}")
+            target_eni = enis[0]
+            tip, taz = target_eni.get("PrivateIpAddress"), taz or target_eni.get("AvailabilityZone")
+        else:
+            tip = tid
+            if taz == "all":
+                return unknown(f"ip target {tid} is outside the VPC (availability zone 'all'); not followed")
+        try:
+            if ipaddress.ip_address(str(tip)).version != 4:
+                raise ValueError(tip)
+        except ValueError:
+            return unknown(f"target address {tip} of {tg_name} is not an IPv4 address; IPv6 is not evaluated")
+        if not tport:
+            return unknown(f"neither the target {tid} nor {tg_name} gives a port")
+
+        keep = preserve == "true" and not privatelink
+        new_flow = flow.with_changes(src=flow.src if keep else node_ip, dst=str(tip), dst_port=int(tport),
+                                     src_port=flow.src_port if keep else None)
+        nat = f"DNAT {flow.dst}:{flow.dst_port} -> {tip}:{tport}; " + (
+            "client address preserved" if keep else f"SNAT {flow.src} -> {node_ip}")
+        info.append(f"target type {ttype}, preserve_client_ip.enabled={preserve}")
+        if privatelink:
+            info.append("PrivateLink traffic: the target sees the NLB node address, not the client; AWS does not "
+                        "preserve the client address through an endpoint, whatever the target group attribute says")
+        cz = attrs.get("load_balancing.cross_zone.enabled")
+        if cz not in ("true", "false"):  # use_load_balancer_configuration: the NLB's own setting decides
+            cz = self._attributes(owner, region, "describe_load_balancer_attributes",
+                                  LoadBalancerArn=lb["LoadBalancerArn"]).get("load_balancing.cross_zone.enabled")
+        node_az = node_eni.get("AvailabilityZone")
+        if cz != "true" and taz and node_az and taz != node_az:
+            lb_zones = {z.get("ZoneName") for z in lb.get("AvailabilityZones") or []}
+            warn.append(f"cross-zone load balancing is {'off' if cz == 'false' else 'not readable'}: the NLB node in "
+                        f"{node_az} sends only to targets in its own zone, but {tid} is in {taz}"
+                        + ("" if taz in lb_zones else f" (the NLB has no subnet in {taz})"))
+        target_id = target_eni["NetworkInterfaceId"] if target_eni else tid
+        hops.append(self._hop(owner, "target-group", tg_name, Status.WARN if warn else Status.INFO,
+                              f"{tg_name} -> {tid}:{tport} ({state(chosen)})", ingress=node_id, egress=target_id,
+                              policy=f"target health {state(chosen)}", nat=nat, details=info + warn))
+        warnings.extend(f"{tg_name}: {w}" for w in warn)
+
+        vpc_id = tg.get("VpcId") or lb["VpcId"]
+        self._at(region, vpc_id)
+        peer = target_eni or self._peer_eni(new_flow.dst, owner, region)
+        if not self._sg_check(owner, region, node_eni, new_flow, egress=True, peer_eni=peer, hops=hops):
+            return StepResult(hops, new_flow, outcome=Outcome.BLOCKED,
+                              reason=f"security group on NLB node {node_id} blocks egress to the target")
+        res = self._deliver_local(owner, region, vpc_id, node_eni["SubnetId"], new_flow, hops, warnings)
+        if res.outcome == Outcome.REACHABLE:
+            res.reason += f" via NLB {name} ({'PrivateLink' if privatelink else 'direct'})"
+        return res
 
     def _via_peering(self, acct: str, region: str, subnet_id: str, pcx_id: str, flow: Flow, hops: list[Hop],
                      warnings: list[str]) -> StepResult:

@@ -331,6 +331,10 @@ class Tracer:
                 why = "cancelled by user" if fwd.cancelled else f"the forward trace ended {fwd.outcome.value}"
                 fwd.return_path = symmetry.not_run(fwd, f"return trace not run: {why}")
                 return fwd
+            why = symmetry.untraceable_return(fwd)
+            if why:
+                fwd.return_path = symmetry.not_run(fwd, f"return trace not run: {why}")
+                return fwd
             rflow, notes = symmetry.return_flow(fwd)
             self.progress(f"tracing the return path {rflow.describe()}")
             keep, self.check_return = self.check_return, False  # the AWS return-NACL check is this trace

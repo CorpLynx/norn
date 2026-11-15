@@ -11,7 +11,7 @@ def inv():
 
 
 def test_preset_count():
-    assert len(PRESETS) == 17  # 14 original + 3 return-path scenarios (see test_return_path.py)
+    assert len(PRESETS) == 19  # 14 original + 3 return-path scenarios (see test_return_path.py) + 2 PrivateLink (D21)
 
 
 @pytest.mark.parametrize("preset", PRESETS, ids=[p["id"] for p in PRESETS])

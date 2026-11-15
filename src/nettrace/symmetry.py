@@ -26,6 +26,10 @@ from nettrace.netutil import DEFAULT_EPHEMERAL_PORT, uses_ports
 DEVICE_DOMAINS = frozenset({"cisco", "panos", "prisma"})
 STATEFUL_DOMAINS = frozenset({"panos", "prisma"})
 # AWS path elements that identify a route through the cloud network (not the endpoints' own SG / NACL / subnet route table)
+# NOT listed, on purpose (D21): "interface-endpoint", "nlb" and "target-group". They are not routed hops. A reply
+# returns over the connection the load balancer holds, not through them, so the return trace never contains them and
+# listing them would call every PrivateLink / NLB path ASYMMETRIC. untraceable_return() below covers the cases where the
+# return trace itself would be meaningless.
 TRANSIT_COMPONENTS = frozenset({"tgw-route-table", "nat-gateway", "vgw", "vpc-peering", "gwlb-endpoint",
                                 "internet-gateway", "vpc-endpoint"})
 
@@ -89,6 +93,26 @@ def stateful_reply_enis(fwd: TraceResult) -> dict[str, int]:
         if sg is not None and sg.status == Status.PASS and sg.ingress == last.node:
             out[last.node] = sg.index
     return out
+
+
+def untraceable_return(fwd: TraceResult) -> str | None:
+    """Why a return trace would mean nothing for this forward path, or None (D21).
+
+    PrivateLink: the provider sees the NLB node, not the client, and the client's address need not be routable from the
+    provider VPC (overlapping ranges are normal); the reply travels back over the same connection. An NLB that replaced
+    the source address (client IP not preserved) likewise: the real reply goes to the NLB node, and a trace to the original
+    client would follow a path no packet takes. With the client address preserved the reply is routed to the client like
+    any other, so that case is traced normally."""
+    lb = [h for h in fwd.hops if h.domain == "aws" and h.component in ("interface-endpoint", "nlb")]
+    if not lb:
+        return None
+    if any(h.component == "interface-endpoint" for h in lb):
+        return ("the path crosses AWS PrivateLink: the reply returns over the same connection, and the client "
+                "address is not what the service sees")
+    seen = fwd.final_flow or fwd.flow
+    if seen.src != fwd.flow.src:
+        return "the NLB replaced the source address, so the reply is addressed to the NLB node, not the client"
+    return None
 
 
 def not_run(fwd: TraceResult, reason: str) -> ReturnPath:

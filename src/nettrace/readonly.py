@@ -138,8 +138,17 @@ _AWS_ALLOWED = frozenset(
         "DescribeTransitGatewayVpcAttachments", "DescribeTransitGatewayPeeringAttachments",
         "SearchTransitGatewayRoutes", "DescribeVpcEndpoints", "DescribeNatGateways",
         "DescribeVpcPeeringConnections", "DescribeVpnGateways",
+        "DescribeVpcEndpointServices", "DescribeVpcEndpointServiceConfigurations",  # PrivateLink (D21)
+    )]
+    # Elastic Load Balancing v2: botocore names this service "elbv2" (service_model.service_name); the IAM prefix
+    # is "elasticloadbalancing". The guard uses the first, iam/nettrace-readonly-policy.json the second (D21).
+    + [("elbv2", op) for op in (
+        "DescribeLoadBalancers", "DescribeListeners", "DescribeTargetGroups", "DescribeTargetHealth",
+        "DescribeTargetGroupAttributes", "DescribeLoadBalancerAttributes",
     )]
 )
+# botocore service name -> IAM action prefix, for the services where they differ
+AWS_IAM_PREFIX = {"elbv2": "elasticloadbalancing"}
 
 
 def aws_operation_allowed(service: str, operation: str) -> bool:

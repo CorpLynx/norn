@@ -20,7 +20,15 @@
         "ec2:DescribeVpcEndpoints",
         "ec2:DescribeNatGateways",
         "ec2:DescribeVpcPeeringConnections",
-        "ec2:DescribeVpnGateways"
+        "ec2:DescribeVpnGateways",
+        "ec2:DescribeVpcEndpointServices",
+        "ec2:DescribeVpcEndpointServiceConfigurations",
+        "elasticloadbalancing:DescribeLoadBalancers",
+        "elasticloadbalancing:DescribeListeners",
+        "elasticloadbalancing:DescribeTargetGroups",
+        "elasticloadbalancing:DescribeTargetHealth",
+        "elasticloadbalancing:DescribeTargetGroupAttributes",
+        "elasticloadbalancing:DescribeLoadBalancerAttributes"
       ],
       "Resource": "*"
     }

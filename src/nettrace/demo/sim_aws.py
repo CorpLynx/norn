@@ -1,7 +1,9 @@
-"""AWS EC2 API simulator for the demo lab: answers the Describe/Get/Search calls nettrace makes.
+"""AWS EC2 and ELB v2 API simulator for the demo lab: answers the Describe/Get/Search calls nettrace makes.
 
-Visibility mirrors AWS: VPC-scoped resources (subnets, route tables, NACLs, SGs, ENIs) are only
-visible to their owner account; Transit Gateway resources are shared with every lab account (RAM).
+Visibility mirrors AWS: VPC-scoped resources (subnets, route tables, NACLs, SGs, ENIs, VPC endpoints, load balancers,
+endpoint service configurations) are only visible to their owner account; Transit Gateway resources are shared with
+every lab account (RAM); DescribeVpcEndpointServices shows a service to any consumer. Response shapes follow the
+EC2 and ELB v2 API references (field names as documented).
 """
 
 from __future__ import annotations
@@ -105,12 +107,71 @@ class Backend:
             return {"Routes": self._search(params), "AdditionalRoutesAvailable": False}
         if op == "get_managed_prefix_list_entries":
             return {"Entries": []}
+        if op == "describe_vpc_endpoints":
+            return {"VpcEndpoints": _apply(self._owned("vpc_endpoints", account), params, "VpcEndpointId", "VpcEndpointIds")}
+        if op == "describe_vpc_endpoint_services":
+            return self._endpoint_services(params)
+        if op == "describe_vpc_endpoint_service_configurations":
+            cfgs = m["service_configs"].get(account, [])
+            return {"ServiceConfigurations": _apply(cfgs, params, "ServiceId", "ServiceIds")}
+        if op in _ELB_OPS:
+            return self._elb(account, op, params)
         if op in _EMPTY:
             ids = next((v for k, v in params.items() if k.endswith("Ids")), None)
             if ids:
                 raise SimAwsError(f"InvalidID.NotFound: {', '.join(ids)}")
             return _EMPTY[op]
         raise SimAwsError(f"{op} is not simulated in the demo lab")
+
+    def _endpoint_services(self, params: dict[str, Any]) -> dict[str, Any]:
+        details = self.m["endpoint_services"]
+        names = params.get("ServiceNames")
+        if names:
+            missing = set(names) - {d["ServiceName"] for d in details}
+            if missing:  # real AWS: InvalidServiceName
+                raise SimAwsError(f"InvalidServiceName: {', '.join(sorted(missing))}")
+            details = [d for d in details if d["ServiceName"] in names]
+        return {"ServiceNames": [d["ServiceName"] for d in details], "ServiceDetails": copy.deepcopy(details)}
+
+    def _elb(self, account: str, op: str, params: dict[str, Any]) -> dict[str, Any]:
+        """ELB v2 reads. A load balancer and everything under it is visible to its owner account only; an ARN the
+        account does not own is "not found", as in AWS."""
+        own = self.m["elb"].get(account, {})
+        lbs = own.get("load_balancers", [])
+        if op == "describe_load_balancers":
+            arns, names = params.get("LoadBalancerArns"), params.get("Names")
+            out = [lb for lb in lbs if (not arns or lb["LoadBalancerArn"] in arns)
+                   and (not names or lb["LoadBalancerName"] in names)]
+            if (arns and len(out) != len(set(arns))) or (names and len(out) != len(set(names))):
+                raise SimAwsError("LoadBalancerNotFound: One or more load balancers not found")
+            return {"LoadBalancers": copy.deepcopy(out)}
+        if op == "describe_listeners":
+            arn = params.get("LoadBalancerArn")
+            if arn and arn not in {lb["LoadBalancerArn"] for lb in lbs}:
+                raise SimAwsError(f"LoadBalancerNotFound: {arn}")
+            ls = [x for x in own.get("listeners", []) if (not arn or x["LoadBalancerArn"] == arn)
+                  and (not params.get("ListenerArns") or x["ListenerArn"] in params["ListenerArns"])]
+            return {"Listeners": copy.deepcopy(ls)}
+        tgs = own.get("target_groups", [])
+        if op == "describe_target_groups":
+            arns, lb = params.get("TargetGroupArns"), params.get("LoadBalancerArn")
+            out = [t for t in tgs if (not arns or t["TargetGroupArn"] in arns) and (not lb or lb in t["LoadBalancerArns"])]
+            if arns and len(out) != len(set(arns)):
+                raise SimAwsError("TargetGroupNotFound: One or more target groups not found")
+            return {"TargetGroups": copy.deepcopy(out)}
+        if op == "describe_load_balancer_attributes":
+            arn = params["LoadBalancerArn"]
+            if arn not in own.get("lb_attributes", {}):
+                raise SimAwsError(f"LoadBalancerNotFound: {arn}")
+            return {"Attributes": copy.deepcopy(own["lb_attributes"][arn])}
+        arn = params["TargetGroupArn"]
+        if arn not in {t["TargetGroupArn"] for t in tgs}:
+            raise SimAwsError(f"TargetGroupNotFound: {arn}")
+        if op == "describe_target_group_attributes":
+            return {"Attributes": copy.deepcopy(own["tg_attributes"][arn])}
+        health = own["target_health"].get(arn, [])
+        wanted = {(t["Id"], t.get("Port")) for t in params.get("Targets", [])}
+        return {"TargetHealthDescriptions": copy.deepcopy([h for h in health if not wanted or (h["Target"]["Id"], h["Target"].get("Port")) in wanted])}
 
     def _search(self, params: dict[str, Any]) -> list[dict[str, Any]]:
         routes = self.m["tgw_routes"].get(params["TransitGatewayRouteTableId"])
@@ -132,6 +193,9 @@ class Backend:
         return copy.deepcopy(hits)
 
 
+_ELB_OPS = frozenset({"describe_load_balancers", "describe_listeners", "describe_target_groups", "describe_target_health",
+                     "describe_target_group_attributes", "describe_load_balancer_attributes"})
+
 _EMPTY = {
     "describe_network_interfaces": {"NetworkInterfaces": []}, "describe_subnets": {"Subnets": []},
     "describe_vpcs": {"Vpcs": []}, "describe_route_tables": {"RouteTables": []},
@@ -139,6 +203,10 @@ _EMPTY = {
     "describe_nat_gateways": {"NatGateways": []}, "describe_vpc_endpoints": {"VpcEndpoints": []},
     "describe_vpc_peering_connections": {"VpcPeeringConnections": []}, "describe_vpn_gateways": {"VpnGateways": []},
     "describe_transit_gateway_peering_attachments": {"TransitGatewayPeeringAttachments": []},
+    "describe_vpc_endpoint_service_configurations": {"ServiceConfigurations": []},
+    "describe_vpc_endpoint_services": {"ServiceNames": [], "ServiceDetails": []},
+    "describe_load_balancers": {"LoadBalancers": []}, "describe_listeners": {"Listeners": []},
+    "describe_target_groups": {"TargetGroups": []},
 }
 
 

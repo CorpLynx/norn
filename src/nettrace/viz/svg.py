@@ -94,10 +94,10 @@ def _icon(kind: str) -> str:
     if kind == "natgw":
         return (f'<rect x="-21" y="-19" width="42" height="38" rx="7" fill="#d67a1e"/>'
                 f'<text y="5" text-anchor="middle" fill="{w}" style="font:700 13px system-ui,-apple-system,Roboto,Arial,sans-serif">NAT</text>')
-    if kind in ("gwlbe", "vpce"):
+    if kind in ("gwlbe", "vpce", "nlb"):
         return (f'<rect x="-21" y="-19" width="42" height="38" rx="7" fill="#6a5acd"/>'
                 f'<text y="5" text-anchor="middle" fill="{w}" style="font:700 11px system-ui,-apple-system,Roboto,Arial,sans-serif">'
-                f'{"GWLB" if kind == "gwlbe" else "VPCE"}</text>')
+                f'{"GWLB" if kind == "gwlbe" else "NLB" if kind == "nlb" else "VPCE"}</text>')
     if kind == "error":
         return (f'<circle r="20" fill="#6d3fc0"/><text y="7" text-anchor="middle" fill="{w}" '
                 'style="font:700 20px system-ui,-apple-system,Roboto,Arial,sans-serif">?</text>')

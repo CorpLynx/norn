@@ -53,7 +53,10 @@ and `--query` (JMESPath) accepted anywhere on the line.
      directory is never followed, the file is 0600; demo-lab runs add `"demo": true`). Requests only,
      never responses or credentials. This includes the SCM token POST and Netmiko's login prep (`terminal length/width`, `enable`). New request paths must call `audit.log` / `audit.refused`.
    - AWS: a botocore `before-call` hook allows only an exact allowlist of (service, operation) pairs
-     (the EC2 reads in `iam/nettrace-readonly-policy.json`) and `sts:AssumeRole` (900 s, that policy as the
+     (the EC2 reads in `iam/nettrace-readonly-policy.json`, plus the PrivateLink reads `ec2:DescribeVpcEndpointServices` and
+     `ec2:DescribeVpcEndpointServiceConfigurations` and six ELB v2 reads: `DescribeLoadBalancers`, `DescribeListeners`,
+     `DescribeTargetGroups`, `DescribeTargetHealth`, `DescribeTargetGroupAttributes`, `DescribeLoadBalancerAttributes`; botocore calls the
+     service `elbv2`, the IAM prefix is `elasticloadbalancing`, see D21) and `sts:AssumeRole` (900 s, that policy as the
      inline session `Policy`, which fails closed: packaged in `nettrace/data/`, AssumeRole is refused if it cannot be
      loaded or is over 2048 chars unless `NETTRACE_ALLOW_NO_SESSION_POLICY=1`; session name `nettrace-<user>-<host>`, re-assumed once on `ExpiredToken`;
      cross-account roles need `external_id_env` when `aws.base_account_id` is set, else a warning).
@@ -122,7 +125,7 @@ and `--query` (JMESPath) accepted anywhere on the line.
 ## Status (as of 2026-11-08)
 
 - v0.4.0. It works end to end in simulation: a custom EC2 simulator for AWS (`demo/sim_aws.py`), canned Cisco, PAN-OS, Panorama and SCM
-  answers. The demo lab's 17 presets (12 original + `guest-nat`, `ipv6-not-evaluated` + the 3 `return-*` scenarios) all give their expected outcome (`tests/test_demo_presets.py`).
+  answers. The demo lab's 19 presets (12 original + `guest-nat`, `ipv6-not-evaluated` + the 3 `return-*` scenarios + the 2 PrivateLink/NLB ones) all give their expected outcome (`tests/test_demo_presets.py`).
 - Path maps: `trace run --map x.html|x.svg` / `--open` and `nettrace viz render` draw a NetBrain-style
   map from the trace JSON (`src/nettrace/viz/`). The HTML is a single offline file.
 - Demo lab plus web UI:
@@ -131,7 +134,7 @@ and `--query` (JMESPath) accepted anywhere on the line.
   - `--demo` on any command runs it against the simulated Acme Corp lab (`src/nettrace/demo/`).
   **First live run 2026-11-14** (D20): AWS (four accounts, Transit Gateway, cross-account) and one VM-Series 11.1 reached
   directly, against the aws-networking-lab; three bugs found and fixed. Still never run against Panorama, Prisma Access or
-  Cisco devices, PAN-OS advanced routing, or AWS load balancers / PrivateLink.
+  Cisco devices, PAN-OS advanced routing, or AWS load balancers / PrivateLink (D21 follows them in simulation only).
 - PAN-OS hops go **through Panorama** when the device has a `serial` and a `panorama:` section exists.
   Requests carry `target=<serial>`. Panorama also supplies HA state (passive members are redirected to
   the active peer) and device-group context. `via: direct` still talks straight to a firewall.

@@ -194,7 +194,23 @@ ATT_VPN, ATT_INSP = rid("tgw-attach", "vpn-dc1"), rid("tgw-attach", "inspection"
 ATT_PROD, ATT_SHARED = rid("tgw-attach", "prod"), rid("tgw-attach", "shared")
 VPC_INSP, VPC_PROD, VPC_SHARED = rid("vpc", "inspection"), rid("vpc", "prod"), rid("vpc", "shared")
 IGW_INSP = rid("igw", "inspection")
-ENI = {name: rid("eni", name) for name in ("fw-trust", "fw-untrust", "web01", "db01", "dns01")}
+ENI = {name: rid("eni", name) for name in ("fw-trust", "fw-untrust", "web01", "db01", "dns01",
+                                           "ep-tools", "nlb-tools", "tools01")}
+
+# PrivateLink path (D21): web01 -> interface endpoint in app-prod -> endpoint service owned by shared-services ->
+# internal NLB -> target group -> instance tools01.
+EP_TOOLS_IP, NLB_TOOLS_IP, TOOLS01_IP = "10.20.3.20", "10.30.2.10", "10.30.3.40"
+VPCE_TOOLS = rid("vpce", "tools")
+VPCE_SVC_ID = rid("vpce-svc", "tools")
+VPCE_SVC_NAME = f"com.amazonaws.vpce.{REGION}.{VPCE_SVC_ID}"
+TOOLS01_INSTANCE = rid("i", "tools01")
+NLB_NAME = "tools-nlb"
+NLB_ID = rid("nlb", NLB_NAME, 17).split("-", 1)[1][:16]  # 16 hex characters, like a real load balancer id
+NLB_ARN = f"arn:aws:elasticloadbalancing:{REGION}:{ACCT_SHARED}:loadbalancer/net/{NLB_NAME}/{NLB_ID}"
+NLB_LISTENER_ARN = f"arn:aws:elasticloadbalancing:{REGION}:{ACCT_SHARED}:listener/net/{NLB_NAME}/{NLB_ID}/{NLB_ID[::-1]}"
+TG_NAME = "tools-tg"
+TG_ARN = (f"arn:aws:elasticloadbalancing:{REGION}:{ACCT_SHARED}:targetgroup/{TG_NAME}/"
+          f"{rid('tg', TG_NAME, 17).split('-', 1)[1][:16]}")
 
 
 def _aws_model() -> dict[str, Any]:
@@ -208,7 +224,9 @@ def _aws_model() -> dict[str, Any]:
         ("insp-fw-untrust", ACCT_NET, VPC_INSP, "10.100.2.0/24"),
         ("prod-tgw", ACCT_PROD, VPC_PROD, "10.20.0.0/28"), ("prod-app", ACCT_PROD, VPC_PROD, "10.20.1.0/24"),
         ("prod-db", ACCT_PROD, VPC_PROD, "10.20.2.0/24"),
-        ("shared-tgw", ACCT_SHARED, VPC_SHARED, "10.30.0.0/28"), ("shared-svc", ACCT_SHARED, VPC_SHARED, "10.30.1.0/24"))}
+        ("shared-tgw", ACCT_SHARED, VPC_SHARED, "10.30.0.0/28"), ("shared-svc", ACCT_SHARED, VPC_SHARED, "10.30.1.0/24"),
+        ("prod-endpoints", ACCT_PROD, VPC_PROD, "10.20.3.0/24"), ("shared-nlb", ACCT_SHARED, VPC_SHARED, "10.30.2.0/24"),
+        ("shared-tools", ACCT_SHARED, VPC_SHARED, "10.30.3.0/24"))}
 
     def local(cidr: str) -> dict[str, Any]:
         return {"DestinationCidrBlock": cidr, "GatewayId": "local", "State": "active"}
@@ -226,9 +244,9 @@ def _aws_model() -> dict[str, Any]:
             [local("10.100.0.0/16"), {"DestinationCidrBlock": "10.0.0.0/8", "TransitGatewayId": TGW},
              {"DestinationCidrBlock": "100.64.0.0/10", "TransitGatewayId": TGW},
              {"DestinationCidrBlock": "0.0.0.0/0", "GatewayId": IGW_INSP}], main=True),
-        rtb("prod-rt", ACCT_PROD, VPC_PROD, ["prod-app", "prod-db", "prod-tgw"],
+        rtb("prod-rt", ACCT_PROD, VPC_PROD, ["prod-app", "prod-db", "prod-tgw", "prod-endpoints"],
             [local("10.20.0.0/16"), {"DestinationCidrBlock": "0.0.0.0/0", "TransitGatewayId": TGW}], main=True),
-        rtb("shared-rt", ACCT_SHARED, VPC_SHARED, ["shared-svc", "shared-tgw"],
+        rtb("shared-rt", ACCT_SHARED, VPC_SHARED, ["shared-svc", "shared-tgw", "shared-nlb", "shared-tools"],
             [local("10.30.0.0/16"), {"DestinationCidrBlock": "0.0.0.0/0", "TransitGatewayId": TGW}], main=True),
     ]
 
@@ -251,12 +269,13 @@ def _aws_model() -> dict[str, Any]:
         nacl("insp-default", ACCT_NET, VPC_INSP, ["insp-tgw", "insp-fw-trust", "insp-fw-untrust"], default_entries()),
         # prod-default also has an outbound deny to the branch-12 prefix (preset return-blocked): the request gets in,
         # the reply is dropped. NACLs are stateless, so this is a real block of the return direction.
-        nacl("prod-default", ACCT_PROD, VPC_PROD, ["prod-app", "prod-tgw"],
+        nacl("prod-default", ACCT_PROD, VPC_PROD, ["prod-app", "prod-tgw", "prod-endpoints"],
              [entry(90, True, "deny", "10.50.12.0/24"), *default_entries()]),
         nacl("prod-db-nacl", ACCT_PROD, VPC_PROD, ["prod-db"], [
             entry(100, False, "allow", "10.20.1.0/24", "6", (5432, 5432)), entry(32767, False, "deny", "0.0.0.0/0"),
             entry(100, True, "allow", "10.20.1.0/24", "6", (1024, 65535)), entry(32767, True, "deny", "0.0.0.0/0")]),
-        nacl("shared-default", ACCT_SHARED, VPC_SHARED, ["shared-svc", "shared-tgw"], default_entries()),
+        nacl("shared-default", ACCT_SHARED, VPC_SHARED, ["shared-svc", "shared-tgw", "shared-nlb", "shared-tools"],
+             default_entries()),
     ]
 
     def perm(proto: str, lo: int | None, hi: int | None, cidrs: list[str] = (), groups: list[str] = ()) -> dict[str, Any]:
@@ -267,7 +286,7 @@ def _aws_model() -> dict[str, Any]:
         return p
 
     all_out = [perm("-1", None, None, ["0.0.0.0/0"])]
-    sg = {n: rid("sg", n) for n in ("fw", "web", "db", "dns")}
+    sg = {n: rid("sg", n) for n in ("fw", "web", "db", "dns", "ep", "nlb", "tools")}
     security_groups = [
         {"GroupId": sg["fw"], "GroupName": "vmseries-data", "VpcId": VPC_INSP, "OwnerId": ACCT_NET,
          "IpPermissions": [perm("-1", None, None, ["0.0.0.0/0"])], "IpPermissionsEgress": all_out},
@@ -279,14 +298,25 @@ def _aws_model() -> dict[str, Any]:
         {"GroupId": sg["dns"], "GroupName": "dns-resolvers", "VpcId": VPC_SHARED, "OwnerId": ACCT_SHARED,
          "IpPermissions": [perm("udp", 53, 53, ["10.0.0.0/8"]), perm("tcp", 53, 53, ["10.0.0.0/8"])],
          "IpPermissionsEgress": all_out},
+        # PrivateLink: the endpoint takes 443 and 8080 from its own VPC; the NLB (inbound rules on PrivateLink traffic
+        # switched off) is only open to its own VPC by rule; the tools server trusts the NLB's security group.
+        {"GroupId": sg["ep"], "GroupName": "tools-endpoint", "VpcId": VPC_PROD, "OwnerId": ACCT_PROD,
+         "IpPermissions": [perm("tcp", 443, 443, ["10.20.0.0/16"]), perm("tcp", 8080, 8080, ["10.20.0.0/16"])],
+         "IpPermissionsEgress": all_out},
+        {"GroupId": sg["nlb"], "GroupName": "tools-nlb", "VpcId": VPC_SHARED, "OwnerId": ACCT_SHARED,
+         "IpPermissions": [perm("tcp", 443, 443, ["10.30.0.0/16"])], "IpPermissionsEgress": all_out},
+        {"GroupId": sg["tools"], "GroupName": "tools-server", "VpcId": VPC_SHARED, "OwnerId": ACCT_SHARED,
+         "IpPermissions": [perm("tcp", 8443, 8443, groups=[sg["nlb"]])], "IpPermissionsEgress": all_out},
     ]
 
     def eni(name: str, acct: str, sub: str, ip: str, group: str, *, instance: str | None = None, index: int = 0,
-            sdc: bool = True, desc: str = "") -> dict[str, Any]:
+            sdc: bool = True, desc: str = "", itype: str = "interface") -> dict[str, Any]:
         e = {"NetworkInterfaceId": ENI[name], "SubnetId": s[sub]["SubnetId"], "VpcId": s[sub]["VpcId"], "OwnerId": acct,
              "AvailabilityZone": AZ, "PrivateIpAddress": ip, "PrivateIpAddresses": [{"PrivateIpAddress": ip, "Primary": True}],
-             "Groups": [{"GroupId": sg[group]}], "SourceDestCheck": sdc, "InterfaceType": "interface",
+             "Groups": [{"GroupId": sg[group]}], "SourceDestCheck": sdc, "InterfaceType": itype,
              "Description": desc, "Status": "in-use"}
+        if itype in ("vpc_endpoint", "network_load_balancer"):
+            e["RequesterManaged"] = True  # AWS creates and owns these in the customer's subnet
         if instance:
             e["Attachment"] = {"InstanceId": instance, "DeviceIndex": index, "Status": "attached"}
         return e
@@ -299,7 +329,61 @@ def _aws_model() -> dict[str, Any]:
         eni("web01", ACCT_PROD, "prod-app", "10.20.1.50", "web", instance=rid("i", "web01"), desc="web01"),
         eni("db01", ACCT_PROD, "prod-db", "10.20.2.10", "db", desc="RDSNetworkInterface (orders-db)"),
         eni("dns01", ACCT_SHARED, "shared-svc", "10.30.1.53", "dns", instance=rid("i", "dns01"), desc="dns01"),
+        eni("ep-tools", ACCT_PROD, "prod-endpoints", EP_TOOLS_IP, "ep", itype="vpc_endpoint",
+            desc=f"VPC Endpoint Interface {VPCE_TOOLS}"),
+        eni("nlb-tools", ACCT_SHARED, "shared-nlb", NLB_TOOLS_IP, "nlb", itype="network_load_balancer",
+            desc=f"ELB net/{NLB_NAME}/{NLB_ID}"),
+        eni("tools01", ACCT_SHARED, "shared-tools", TOOLS01_IP, "tools", instance=TOOLS01_INSTANCE, desc="tools01"),
     ]
+
+    dns_base = f"{VPCE_SVC_ID}.vpce-svc.{REGION}.vpce.amazonaws.com"
+    endpoint_services = [{  # DescribeVpcEndpointServices: what a consumer sees (Owner is the provider's account)
+        "ServiceName": VPCE_SVC_NAME, "ServiceId": VPCE_SVC_ID, "ServiceType": [{"ServiceType": "Interface"}],
+        "AvailabilityZones": [AZ], "Owner": ACCT_SHARED, "BaseEndpointDnsNames": [dns_base],
+        "VpcEndpointPolicySupported": False, "AcceptanceRequired": False, "ManagesVpcEndpoints": False,
+        "Tags": [{"Key": "Name", "Value": "tools"}]}]
+    vpc_endpoints = [{
+        "VpcEndpointId": VPCE_TOOLS, "VpcEndpointType": "Interface", "VpcId": VPC_PROD, "ServiceName": VPCE_SVC_NAME,
+        "State": "available", "SubnetIds": [s["prod-endpoints"]["SubnetId"]],
+        "Groups": [{"GroupId": sg["ep"], "GroupName": "tools-endpoint"}],
+        "PrivateDnsEnabled": False, "RequesterManaged": False, "NetworkInterfaceIds": [ENI["ep-tools"]],
+        "OwnerId": ACCT_PROD, "RouteTableIds": [], "DnsEntries": [], "Tags": [{"Key": "Name", "Value": "tools"}]}]
+    service_configs = {ACCT_SHARED: [{  # DescribeVpcEndpointServiceConfigurations: the provider's own view
+        "ServiceType": [{"ServiceType": "Interface"}], "ServiceId": VPCE_SVC_ID, "ServiceName": VPCE_SVC_NAME,
+        "ServiceState": "Available", "AvailabilityZones": [AZ], "AcceptanceRequired": False,
+        "ManagesVpcEndpoints": False, "NetworkLoadBalancerArns": [NLB_ARN], "BaseEndpointDnsNames": [dns_base]}]}
+
+    def attrs(**kv: str) -> list[dict[str, str]]:  # "a__b" -> key "a.b"
+        return [{"Key": k.replace("__", "."), "Value": v} for k, v in kv.items()]
+
+    elb = {ACCT_SHARED: {
+        "load_balancers": [{
+            "LoadBalancerArn": NLB_ARN, "DNSName": f"{NLB_NAME}-{NLB_ID}.elb.{REGION}.amazonaws.com",
+            "LoadBalancerName": NLB_NAME, "Scheme": "internal", "VpcId": VPC_SHARED, "State": {"Code": "active"},
+            "Type": "network",
+            "AvailabilityZones": [{"ZoneName": AZ, "SubnetId": s["shared-nlb"]["SubnetId"],
+                                   "LoadBalancerAddresses": [{"PrivateIPv4Address": NLB_TOOLS_IP}]}],
+            "SecurityGroups": [sg["nlb"]], "IpAddressType": "ipv4",
+            "EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic": "off"}],
+        "listeners": [{
+            "ListenerArn": NLB_LISTENER_ARN, "LoadBalancerArn": NLB_ARN, "Port": 443, "Protocol": "TCP",
+            "DefaultActions": [{"Type": "forward", "TargetGroupArn": TG_ARN, "Order": 1,
+                                "ForwardConfig": {"TargetGroups": [{"TargetGroupArn": TG_ARN, "Weight": 1}],
+                                                  "TargetGroupStickinessConfig": {"Enabled": False}}}]}],
+        "target_groups": [{
+            "TargetGroupArn": TG_ARN, "TargetGroupName": TG_NAME, "Protocol": "TCP", "Port": 8443, "VpcId": VPC_SHARED,
+            "HealthCheckProtocol": "TCP", "HealthCheckPort": "traffic-port", "HealthCheckEnabled": True,
+            "HealthyThresholdCount": 3, "UnhealthyThresholdCount": 3, "HealthCheckIntervalSeconds": 30,
+            "LoadBalancerArns": [NLB_ARN], "TargetType": "instance", "IpAddressType": "ipv4"}],
+        "target_health": {TG_ARN: [{
+            "Target": {"Id": TOOLS01_INSTANCE, "Port": 8443}, "HealthCheckPort": "8443",
+            "TargetHealth": {"State": "healthy"}}]},
+        "tg_attributes": {TG_ARN: attrs(**{"preserve_client_ip__enabled": "true", "proxy_protocol_v2__enabled": "false",
+                                           "load_balancing__cross_zone__enabled": "use_load_balancer_configuration",
+                                           "deregistration_delay__timeout_seconds": "300"})},
+        "lb_attributes": {NLB_ARN: attrs(**{"load_balancing__cross_zone__enabled": "false",
+                                            "deletion_protection__enabled": "false"})},
+    }}
 
     def att(att_id: str, rtype: str, res: str, owner: str, rtb: str) -> dict[str, Any]:
         return {"TransitGatewayAttachmentId": att_id, "TransitGatewayId": TGW, "TransitGatewayOwnerId": ACCT_NET,
@@ -346,6 +430,8 @@ def _aws_model() -> dict[str, Any]:
         "security_groups": security_groups, "enis": enis,
         "tgws": [{"TransitGatewayId": TGW, "OwnerId": ACCT_NET, "State": "available"}],
         "tgw_attachments": tgw_attachments, "vpc_attachments": vpc_attachments, "tgw_routes": tgw_routes,
+        "vpc_endpoints": vpc_endpoints, "endpoint_services": endpoint_services, "service_configs": service_configs,
+        "elb": elb,
     }
 
 
@@ -465,6 +551,16 @@ PRESETS: list[dict[str, Any]] = [
      "story": "The request is allowed end to end, but the stateless NACL on the prod-app subnet denies outbound "
               "traffic to the branch prefix, so the reply never leaves. Forward REACHABLE, return BLOCKED: exit 3.",
      "flow": {"src": "10.50.12.40", "dst": "10.20.1.50", "port": 443, "protocol": "tcp", "return": True}},
+    {"id": "prod-to-tools-privatelink", "title": "Prod app → tools server over PrivateLink", "expect": "REACHABLE",
+     "story": "web01 connects to its interface endpoint in app-prod. The endpoint service belongs to shared-services: "
+              "internal NLB, TCP 443 listener, target group on port 8443, instance tools01. The server sees the NLB "
+              "node as the source (PrivateLink never preserves the client address) and port 8443.",
+     "flow": {"src": "10.20.1.50", "dst": EP_TOOLS_IP, "port": 443, "protocol": "tcp"}},
+    {"id": "prod-to-tools-no-listener", "title": "Prod app → tools endpoint on a port the NLB does not serve",
+     "expect": "BLOCKED",
+     "story": "The endpoint's security group allows 8080, but the NLB behind the endpoint service only listens on TCP "
+              "443: no listener, the connection is refused at the NLB.",
+     "flow": {"src": "10.20.1.50", "dst": EP_TOOLS_IP, "port": 8080, "protocol": "tcp"}},
     {"id": "web-to-db", "title": "Prod web → database", "expect": "REACHABLE",
      "story": "Inside one VPC: NACL on the DB subnet and an SG that references the web-tier SG.",
      "flow": {"src": "10.20.1.50", "dst": "10.20.2.10", "port": 5432, "protocol": "tcp"}},

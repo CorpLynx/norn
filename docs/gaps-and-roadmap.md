@@ -81,9 +81,14 @@ everything else is still checked with mocks only. Each item names the code that 
   (out of scope, "mostly XE").
 
 ### AWS
-- **G13.** Not handled: Cloud WAN, AWS Network Firewall endpoints (treated as a generic VPC endpoint,
-  so the walk EXITs), Direct Connect gateway internals, TGW Connect peers, Local/Carrier gateways,
-  Route 53 Resolver, PrivateLink services, ELB/NLB targets.
+- **G13.** *Partly closed (2026-11-15, D21).* Interface endpoints (PrivateLink) and Network Load Balancers are followed to
+  the real target: endpoint service and owner account, NLB, listener, target group, target health, flow rewrite (DNAT to the
+  target, SNAT to the NLB node unless the client address is preserved) and delivery to the target ENI, in the demo lab only.
+  Still not handled: Cloud WAN, AWS Network Firewall endpoints (treated as a generic VPC endpoint, so the walk EXITs),
+  Direct Connect gateway internals, TGW Connect peers, Local/Carrier gateways, Route 53 Resolver, ALB / CLB / GWLB listeners and
+  ALB or lambda target groups, cross-region PrivateLink, cross-zone behaviour beyond a WARN. The AWS behaviour D21 relies on
+  (client IP through PrivateLink, the PrivateLink inbound-rule field, the endpoint ENI and NLB ENI shapes) is from AWS
+  documentation and has not been checked against a live account (the lab accounts could not create load balancers, D20).
 - **G14.** ECMP across TGW attachments follows the first attachment. Appliance-mode symmetry isn't
   checked.
 - **G15.** *Partly closed (2026-11-11).* `trace run --return` (also a UI checkbox and `"return": true`) runs a

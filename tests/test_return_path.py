@@ -269,7 +269,7 @@ def test_asymmetric_preset_names_the_skipped_firewall():
 
 def test_existing_presets_keep_their_expectations_and_none_asks_for_return_by_accident():
     ids = [p["id"] for p in PRESETS]
-    assert len(ids) == 17 and len([p for p in PRESETS if p["flow"].get("return")]) == 3
+    assert len(ids) == 19 and len([p for p in PRESETS if p["flow"].get("return")]) == 3
     assert ids[:2] == ["dc-to-prod-web", "dc-to-prod-db"]
 
 

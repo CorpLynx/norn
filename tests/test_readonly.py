@@ -174,8 +174,8 @@ def test_iam_policy_matches_allowlist():
     import json
     from pathlib import Path
 
-    from nettrace.readonly import _AWS_ALLOWED
+    from nettrace.readonly import _AWS_ALLOWED, AWS_IAM_PREFIX
 
     pol = json.loads((Path(__file__).parents[1] / "iam" / "nettrace-readonly-policy.json").read_text())
     actions = {a for st in pol["Statement"] for a in st["Action"]}
-    assert actions == {f"{s}:{o}" for s, o in _AWS_ALLOWED if s == "ec2"}
+    assert actions == {f"{AWS_IAM_PREFIX.get(s, s)}:{o}" for s, o in _AWS_ALLOWED if s != "sts"}

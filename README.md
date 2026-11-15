@@ -92,7 +92,7 @@ so any source and destination you type gets a real answer, not just the presets.
 - **Device console.** Runs read-only commands on the device (simulated in the demo, real in live
   mode). The "try a write ✋" chip shows the read-only guard refusing `configure terminal` or a PAN-OS
   `<request>`.
-- **Scenarios and history.** 17 preset scenarios (3 of them trace the return path) with an expected outcome each (see
+- **Scenarios and history.** 19 preset scenarios (3 of them trace the return path) with an expected outcome each (see
   `nettrace demo scenarios`), filterable by outcome, plus a history of recent traces.
 - **Deep links.** `#preset=branch-smb&step=last&node=core-rtr1` opens a scenario at a given step
   with a node selected; `#trace=<id>` reopens a trace from history. These work after
@@ -141,7 +141,7 @@ How the server is locked down:
 | PAN-OS | PAN-OS XML API | the firewall evaluates the flow itself: `test routing fib-lookup`, `test nat-policy-match`, `test security-policy-match` |
 | Panorama | PAN-OS XML API `target=<serial>` | proxies those firewall queries; supplies managed devices, HA state, device groups |
 | Prisma Access | Strata Cloud Manager config API | GET security rules + objects, evaluated by nettrace |
-| AWS | boto3 | `Describe*`, `Get*`, `SearchTransitGatewayRoutes` |
+| AWS | boto3 | `Describe*`, `Get*`, `SearchTransitGatewayRoutes` (EC2) and six ELB v2 `Describe*` calls for NLBs |
 | Output | rich, JMESPath | `--output table|json|text`, `--query` like the AWS CLI |
 
 Tools that were considered and not used as the base: **Batfish** (models saved configs rather than
@@ -389,7 +389,12 @@ in order:
   the endpoint subnet;
 - routes to appliance ENIs, checking the source/dest check flag and the ENI's SGs, then the PAN-OS
   hop, then back into AWS from the firewall's egress ENI;
-- NAT gateways (the source IP is rewritten), IGWs, VPC peering and VGWs.
+- NAT gateways (the source IP is rewritten), IGWs, VPC peering and VGWs;
+- PrivateLink and Network Load Balancers: an interface endpoint (or an NLB's own ENI) is followed to the endpoint
+  service's owner account, the NLB, its listener for the protocol and port, the target group and its targets, and
+  the flow is rewritten (target address and port; the source becomes the NLB node unless the client address is
+  preserved, which PrivateLink never does). Several target groups or targets, no healthy target and cross-zone
+  mismatches are WARN; an owner account outside the inventory is UNKNOWN. Internal NLBs with instance or IP targets only.
 
 ## Limitations
 
@@ -403,5 +408,6 @@ in order:
 - Prisma Access: config-based evaluation, not a live policy test. The rule order returned by SCM is
   taken as evaluation order.
 - IPv4 is the focus. IPv6 routes and SG/NACL entries are matched, but Cisco/PAN IPv6 lookups aren't.
-- Not supported yet: AWS Cloud WAN, Local/Carrier gateways, and Direct Connect gateway internals
+- Not supported yet: ALB/CLB/GWLB listeners and ALB target groups, cross-region PrivateLink, AWS Cloud WAN,
+  Local/Carrier gateways, and Direct Connect gateway internals
   (DX attachments are followed through `links`).

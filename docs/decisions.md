@@ -3,6 +3,69 @@
 Short records of choices made while building nettrace. Each one says why it was made, so a later
 change can be judged against the original reason. Newest first.
 
+## D21. PrivateLink and Network Load Balancers are followed to the real target (2026-11-15)
+A flow to an interface endpoint ENI or an NLB node ENI used to end "delivered to the ENI". It now continues: endpoint ->
+endpoint service (owner account) -> NLB -> listener -> target group -> target -> target ENI, with the NACL and
+security-group checks of D16 at each boundary. Hops use the components `interface-endpoint`, `nlb` and `target-group`
+(structured `ingress`/`egress`/`policy`; `nat` on the target-group hop). Eight read-only calls were added, each through
+`AwsEnv.call` (deadline, cancel, audit): `elbv2` `DescribeLoadBalancers`, `DescribeListeners`, `DescribeTargetGroups`,
+`DescribeTargetHealth`, `DescribeTargetGroupAttributes`, `DescribeLoadBalancerAttributes`, and `ec2`
+`DescribeVpcEndpointServices` (consumer side: the service owner) and `DescribeVpcEndpointServiceConfigurations` (owner side:
+the NLB ARNs). Reachability Analyzer and Network Access Analyzer are still not used (D2/D3 reasons).
+- **Service naming.** botocore names the service `elbv2` (the name the before-call hook sees); the IAM prefix is
+  `elasticloadbalancing`. `readonly._AWS_ALLOWED` uses the first, both policy JSON files the second, `readonly.AWS_IAM_PREFIX`
+  maps one to the other, and `tests/test_aws_privatelink_nlb.py` checks the two agree and that the botocore guard accepts
+  exactly these calls (Stubber, no network). The compact session policy is 966 characters of the 2048 allowed (tested).
+- **What the code relies on** (AWS documentation: *Elastic Load Balancing, Network Load Balancers: target groups, client IP
+  preservation, security groups*; *AWS PrivateLink: concepts, endpoint services, interface endpoints*; EC2 API reference
+  for `DescribeVpcEndpointServices` / `DescribeVpcEndpointServiceConfigurations` and the ELB v2 API reference; recalled from
+  those documents, not re-read during the build, and never run against a real account):
+  - The interface endpoint ENI has `InterfaceType` `vpc_endpoint` and the description `VPC Endpoint Interface vpce-...`; an NLB
+    node ENI has `network_load_balancer` and `ELB net/<name>/<id>`. `DescribeVpcEndpointServices` returns `Owner` (an account id,
+    or `amazon` for AWS services) and `ServiceId`; the owner's `DescribeVpcEndpointServiceConfigurations` returns
+    `NetworkLoadBalancerArns` / `GatewayLoadBalancerArns` and `ServiceState`.
+  - Through PrivateLink the service sees the NLB node's private address as the source, not the client, for instance and IP
+    targets alike. Client IP preservation is not honoured for PrivateLink traffic even where the target group attribute
+    `preserve_client_ip.enabled` is `true`, so PrivateLink always rewrites the source to the node. Without PrivateLink,
+    `preserve_client_ip.enabled` decides (it is read, never defaulted; absent is UNKNOWN).
+  - The target is reached on its own port (the registered port, else the target group's port); an instance target is its primary
+    network interface's primary private IPv4 address.
+  - The NLB node for PrivateLink traffic is the one in the endpoint's AZ (`LoadBalancerAddresses[].PrivateIPv4Address` of the
+    internal NLB); direct traffic uses the node whose ENI owns the destination IP.
+  - Listener match: TCP/TLS/TCP_UDP/TCP_QUIC for tcp, UDP/TCP_UDP/QUIC/TCP_QUIC for udp, on the destination port. None is a BLOCK
+    ("no listener on <proto>/<port>"). NLB listeners have a single forward default action.
+  - NLB security groups: evaluated (ingress on the node ENI, and egress to the target) for direct traffic. For PrivateLink the
+    load balancer field `EnforceSecurityGroupInboundRulesOnPrivateLinkTraffic` (`on`/`off`) decides whether inbound rules apply;
+    `off` skips them (stated on the hop), `on` evaluates them against the endpoint ENI address. AWS does not document which
+    address inbound rules see for PrivateLink traffic, so a DENY there is UNKNOWN, an allow is PASS, and a missing field when the
+    NLB has security groups is UNKNOWN. Outbound rules are assumed to apply to traffic towards the target either way.
+  - Target health: only `healthy` targets are preferred. With none healthy the NLB fails open (sends to all targets), so the trace
+    follows the first target and WARNs. No registered target is a BLOCK.
+  - Cross-zone: with it off a node sends only to targets in its own zone; a target in another zone is a WARN (and says if the NLB
+    has no subnet there). The setting is the target group's `load_balancing.cross_zone.enabled`, else the NLB's attribute.
+- **Never guess, here.** Several NLBs behind a service, several weighted target groups, several targets: follow the first, WARN
+  listing all (hop status WARN, `warnings`), same as TGW ECMP. An owner account outside the inventory, a gateway load balancer
+  service, an `alb`/`lambda` target group, an IP target outside the VPC (`AvailabilityZone` `all`), a non-TCP/UDP protocol, no
+  destination port, IPv6 targets, a failed read: UNKNOWN, so the trace ends INCOMPLETE. An AWS-owned service ends at the
+  endpoint (REACHABLE, nothing of ours behind it).
+- **Return path.** `interface-endpoint`, `nlb` and `target-group` are deliberately NOT in `symmetry.TRANSIT_COMPONENTS`: they are
+  connection-level, not routed hops, so the reply never crosses them and listing them would make every such path ASYMMETRIC.
+  Instead `symmetry.untraceable_return` makes `--return` NOT_RUN (with the reason) when the path crosses PrivateLink or an NLB
+  replaced the source address: the reply goes to the NLB node, the client address may not be routable from the provider VPC, and
+  a trace to the original client would follow a path no packet takes. An NLB that preserved the client address is traced normally.
+- **Not modelled.** ALB targets and ALB/CLB/GWLB listeners; cross-region PrivateLink; endpoint policies and private DNS; the NACL on
+  the NLB subnet for the client-to-NLB leg of PrivateLink traffic (the address it sees is undocumented; the hop says so); the
+  NLB-to-target NACLs and security groups are evaluated; TLS termination and ALPN; stickiness; client IP hairpinning when the
+  target is the client; which of several NLBs/targets a connection really lands on; the draining/initial nuances of target
+  states; endpoint service allow-lists and acceptance beyond the endpoint's own `State`; connection-level limits (idle timeout,
+  port allocation). Cross-account ENIs in RAM-shared subnets are looked up in the NLB owner's account.
+- **Cancel.** A cancel or deadline during these calls ends the trace INCOMPLETE like any other: the hops of earlier steps are kept,
+  the step in progress is abandoned (as for every driver).
+- **Demo lab.** web01 (app-prod) -> endpoint `10.20.3.20` -> service owned by shared-services -> internal NLB `10.30.2.10` (TCP 443,
+  inbound-rule enforcement for PrivateLink off) -> target group `tools-tg` (port 8443) -> instance tools01. Presets
+  `prod-to-tools-privatelink` (REACHABLE) and `prod-to-tools-no-listener` (BLOCKED: port 8080 passes the endpoint's security group,
+  the NLB has no listener).
+
 ## D20. First run against real AWS and a real VM-Series: three fixes (2026-11-14)
 Norn's first live run: the aws-networking-lab (four accounts, one Transit Gateway with per-VPC route tables, a PAYG
 VM-Series 11.1 in routed mode, reached `via: direct` with a read-only `superreader` API admin). Each check of the lab's
